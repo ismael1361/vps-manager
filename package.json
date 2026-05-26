@@ -1,0 +1,82 @@
+{
+    "name": "@ismael1361/vps-manager",
+    "version": "0.1.0",
+    "description": "Local CLI and web panel for managing Linux VPS add-ons over SSH",
+    "main": "dist/index.js",
+    "module": "dist/index.esm.js",
+    "types": "dist/index.d.ts",
+    "bin": {
+        "vps-manager": "dist/cli.js"
+    },
+    "files": [
+        "dist/",
+        "public/",
+        "addons/"
+    ],
+    "private": false,
+    "publishConfig": {
+        "access": "public",
+        "registry": "https://registry.npmjs.org/"
+    },
+    "scripts": {
+        "start": "tsx -r tsconfig-paths/register src/index.ts",
+        "cli": "tsx -r tsconfig-paths/register src/cli.ts",
+        "build": "npm run clean && npm run build:types && npm run build:bundles",
+        "clean": "rimraf dist",
+        "build:types": "tsc --emitDeclarationOnly --declaration --outDir dist/types",
+        "build:bundles": "rollup -c --bundleConfigAsCjs",
+        "dev": "rollup -c --bundleConfigAsCjs -w",
+        "test": "jest",
+        "test:watch": "jest --watchAll",
+        "prepublishOnly": "npm run build && npm test",
+        "npm:publish": "npm publish --access=public"
+    },
+    "keywords": [
+        "vps",
+        "ssh",
+        "cli",
+        "server",
+        "devops"
+    ],
+    "author": "ISMAEL1361",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/ismael1361/vps-manager.git"
+    },
+    "bugs": {
+        "url": "https://github.com/ismael1361/vps-manager/issues"
+    },
+    "homepage": "https://github.com/ismael1361/vps-manager#readme",
+    "engines": {
+        "node": ">=18.0.0"
+    },
+    "dependencies": {
+        "commander": "^14.0.3",
+        "express": "^5.1.0",
+        "open": "^11.0.0",
+        "ssh2": "^1.17.0",
+        "tslib": "^2.8.1"
+    },
+    "devDependencies": {
+        "@rollup/plugin-commonjs": "^29.0.2",
+        "@rollup/plugin-json": "^6.1.0",
+        "@rollup/plugin-node-resolve": "^16.0.3",
+        "@rollup/plugin-typescript": "^12.3.0",
+        "@types/express": "^5.0.3",
+        "@types/jest": "^30.0.0",
+        "@types/node": "^25.8.0",
+        "@types/open": "^6.2.1",
+        "@types/ssh2": "^1.15.5",
+        "jest": "^30.3.0",
+        "jest-environment-node": "^30.3.0",
+        "rimraf": "^6.1.3",
+        "rollup": "^4.60.4",
+        "rollup-plugin-dts": "^6.4.1",
+        "ts-jest": "^29.4.9",
+        "ts-node": "^10.9.2",
+        "tsconfig-paths": "^4.2.0",
+        "tsx": "^4.22.0",
+        "typescript": "^6.0.3"
+    }
+}
