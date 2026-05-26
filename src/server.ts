@@ -1,137 +1,470 @@
 import express, { type Request, type Response } from "express";
 import http from "http";
+import { randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
-import open from "open";
 import net from "net";
+import type { ClientChannel } from "ssh2";
+import { EventStreamHub } from "./core/events";
+import { getAddonByName, getTriggerByName, loadAddons, type LoadAddonsOptions } from "./core/addon";
+import { prepareTriggerExecution, executePreparedCommands } from "./core/executor";
+import { getPublicDir } from "./core/paths";
+import { SessionStore, type ConnectSessionInput, type RemoteExecClient } from "./core/session";
 
 export interface StartServerOptions {
-    host?: string;
-    preferredPort?: number;
-    autoOpen?: boolean;
+	host?: string;
+	preferredPort?: number;
+	autoOpen?: boolean;
+	addonOptions?: LoadAddonsOptions;
 }
 
 export interface StartedServer {
-    app: express.Express;
-    server: http.Server;
-    host: string;
-    port: number;
-    url: string;
-    close(): Promise<void>;
+	app: express.Express;
+	server: http.Server;
+	host: string;
+	port: number;
+	url: string;
+	close(): Promise<void>;
+}
+
+export interface AppServices {
+	session: SessionStore;
+	events: EventStreamHub;
+	addonOptions?: LoadAddonsOptions;
+}
+
+interface RemoteCommandResult {
+	stdout: string;
+	stderr: string;
+	code: number | null;
+	signal?: string;
 }
 
 const DEFAULT_PORT = 3000;
 const MAX_PORT = 3100;
-const PUBLIC_DIR = path.resolve(__dirname, "../public");
 
 async function isPortAvailable(port: number, host: string) {
-    return new Promise<boolean>((resolve, reject) => {
-        const server = net.createServer();
+	return new Promise<boolean>((resolve, reject) => {
+		const server = net.createServer();
 
-        server.once("error", (error: NodeJS.ErrnoException) => {
-            if (error.code === "EADDRINUSE") {
-                resolve(false);
-                return;
-            }
+		server.once("error", (error: NodeJS.ErrnoException) => {
+			if (error.code === "EADDRINUSE") {
+				resolve(false);
+				return;
+			}
 
-            reject(error);
-        });
+			reject(error);
+		});
 
-        server.listen(port, host, () => {
-            server.close(() => resolve(true));
-        });
-    });
+		server.listen(port, host, () => {
+			server.close(() => resolve(true));
+		});
+	});
 }
 
 async function findAvailablePort(startPort: number, endPort: number, host: string) {
-    for (let port = startPort; port <= endPort; port += 1) {
-        if (await isPortAvailable(port, host)) {
-            return port;
-        }
-    }
+	for (let port = startPort; port <= endPort; port += 1) {
+		if (await isPortAvailable(port, host)) {
+			return port;
+		}
+	}
 
-    return null;
+	return null;
 }
 
 function getBaseUrl(server: http.Server, requestedHost: string) {
-    const address = server.address();
+	const address = server.address();
 
-    if (!address || typeof address === "string") {
-        return `http://${requestedHost}`;
-    }
+	if (!address || typeof address === "string") {
+		return `http://${requestedHost}`;
+	}
 
-    const bindHost = address.address === "::" || address.address === "0.0.0.0" ? "localhost" : address.address;
-    const host = bindHost.includes(":") && !bindHost.startsWith("[") ? `[${bindHost}]` : bindHost;
+	const bindHost = address.address === "::" || address.address === "0.0.0.0" ? "localhost" : address.address;
+	const host = bindHost.includes(":") && !bindHost.startsWith("[") ? `[${bindHost}]` : bindHost;
 
-    return `http://${host}:${address.port}`;
+	return `http://${host}:${address.port}`;
 }
 
-function createApp() {
-    const app = express();
+function errorMessage(error: unknown) {
+	return error instanceof Error ? error.message : String(error);
+}
 
-    app.use(express.json());
+function getStatusCode(error: unknown) {
+	const message = errorMessage(error);
 
-    app.get("/api/health", (_req: Request, res: Response) => {
-        res.json({
-            ok: true,
-            service: "vps-manager",
-            timestamp: new Date().toISOString(),
-        });
-    });
+	if (/not found/i.test(message)) {
+		return 404;
+	}
 
-    if (fs.existsSync(PUBLIC_DIR)) {
-        app.use(express.static(PUBLIC_DIR));
-    }
+	if (/busy/i.test(message)) {
+		return 409;
+	}
 
-    app.get("*", (_req: Request, res: Response) => {
-        const indexPath = path.join(PUBLIC_DIR, "index.html");
-        if (!fs.existsSync(indexPath)) {
-            res.status(404).json({ message: "UI not built yet." });
-            return;
-        }
+	if (/connect to a vps|no active ssh session|unsupported|invalid|required|provide|missing|sudo/i.test(message)) {
+		return 400;
+	}
 
-        res.sendFile(indexPath);
-    });
+	return 500;
+}
 
-    return app;
+function sendError(res: Response, error: unknown) {
+	res.status(getStatusCode(error)).json({
+		message: errorMessage(error),
+	});
+}
+
+function runRemoteCommand(client: RemoteExecClient, command: string) {
+	return new Promise<RemoteCommandResult>((resolve, reject) => {
+		client.exec(command, (error, stream) => {
+			if (error) {
+				reject(error);
+				return;
+			}
+
+			let stdout = "";
+			let stderr = "";
+
+			(stream as ClientChannel).on("data", (chunk: Buffer | string) => {
+				stdout += chunk.toString();
+			});
+
+			(stream as ClientChannel).stderr.on("data", (chunk: Buffer | string) => {
+				stderr += chunk.toString();
+			});
+
+			(stream as ClientChannel).on("close", (code: number | null, signal: string | undefined) => {
+				resolve({
+					stdout,
+					stderr,
+					code,
+					signal,
+				});
+			});
+		});
+	});
+}
+
+function parseKeyValueOutput(content: string) {
+	const values: Record<string, string> = {};
+
+	for (const line of content.split(/\r?\n/)) {
+		if (!line.trim()) {
+			continue;
+		}
+
+		const separatorIndex = line.indexOf("=");
+		if (separatorIndex === -1) {
+			continue;
+		}
+
+		const key = line.slice(0, separatorIndex).trim();
+		const value = line.slice(separatorIndex + 1).trim();
+		if (key) {
+			values[key] = value;
+		}
+	}
+
+	return values;
+}
+
+function parseDpkgQuery(content: string) {
+	const packages = new Map<string, string>();
+
+	for (const line of content.split(/\r?\n/)) {
+		if (!line.trim()) {
+			continue;
+		}
+
+		const [packageName, version] = line.split(/\t+/);
+		if (packageName && version) {
+			packages.set(packageName.trim(), version.trim());
+		}
+	}
+
+	return packages;
+}
+
+async function readInstalledAddons(services: AppServices) {
+	if (!services.session.getSnapshot().connected) {
+		throw new Error("Connect to a VPS before checking installed add-ons.");
+	}
+
+	const addons = await loadAddons(services.addonOptions);
+	const packageMap = await services.session.runExclusive(async (client) => {
+		const result = await runRemoteCommand(client, "dpkg-query -W -f='${Package}\\t${Version}\\n' 2>/dev/null || true");
+		return parseDpkgQuery(result.stdout);
+	});
+
+	return addons
+		.filter((entry) => packageMap.has(entry.addon.name))
+		.map((entry) => ({
+			...entry,
+			remoteVersion: packageMap.get(entry.addon.name) || "unknown",
+			detectedBy: "dpkg-query",
+		}));
+}
+
+async function readVpsStatus(services: AppServices) {
+	const snapshot = services.session.getSnapshot();
+	if (!snapshot.connected) {
+		throw new Error("Connect to a VPS before requesting VPS status.");
+	}
+
+	const probeCommand = [
+		"printf 'hostname='; hostname 2>/dev/null || true",
+		"printf '\\nkernel='; uname -r 2>/dev/null || true",
+		"printf '\\nuptime='; uptime -p 2>/dev/null || uptime 2>/dev/null || true",
+		"printf '\\nload='; cat /proc/loadavg 2>/dev/null | awk '{print $1\" \"$2\" \"$3}' || true",
+		"printf '\\nmemory='; free -m 2>/dev/null | awk 'NR==2 {printf \"%s/%s MB\", $3, $2}' || true",
+		"printf '\\ndisk='; df -h / 2>/dev/null | awk 'NR==2 {printf \"%s/%s (%s)\", $3, $2, $5}' || true",
+		"printf '\\n'",
+	].join("; ");
+
+	const system = await services.session.runExclusive(async (client) => {
+		const result = await runRemoteCommand(client, probeCommand);
+		return parseKeyValueOutput(result.stdout);
+	});
+
+	return {
+		connection: snapshot,
+		system,
+		detectedAt: new Date().toISOString(),
+	};
+}
+
+export function createApp(services: AppServices) {
+	const app = express();
+	const publicDir = getPublicDir();
+
+	app.use(express.json({ limit: "2mb" }));
+
+	app.get("/api/health", async (_req: Request, res: Response) => {
+		const addons = await loadAddons(services.addonOptions);
+		res.json({
+			ok: true,
+			service: "vps-manager",
+			catalogSize: addons.length,
+			session: services.session.getSnapshot(),
+			timestamp: new Date().toISOString(),
+		});
+	});
+
+	app.get("/api/stream", (_req: Request, res: Response) => {
+		services.events.attach(res);
+	});
+
+	app.get("/api/session", (_req: Request, res: Response) => {
+		res.json(services.session.getSnapshot());
+	});
+
+	app.post("/api/session/connect", async (req: Request, res: Response) => {
+		try {
+			const snapshot = await services.session.connect(req.body as ConnectSessionInput);
+			services.events.emit("session:changed", snapshot);
+			res.status(201).json(snapshot);
+		} catch (error) {
+			sendError(res, error);
+		}
+	});
+
+	app.post("/api/session/disconnect", async (_req: Request, res: Response) => {
+		try {
+			await services.session.disconnect();
+			const snapshot = services.session.getSnapshot();
+			services.events.emit("session:changed", snapshot);
+			res.json(snapshot);
+		} catch (error) {
+			sendError(res, error);
+		}
+	});
+
+	app.get("/api/addons", async (_req: Request, res: Response) => {
+		try {
+			const addons = await loadAddons(services.addonOptions);
+			res.json(addons);
+		} catch (error) {
+			sendError(res, error);
+		}
+	});
+
+	app.get("/api/addons/installed", async (_req: Request, res: Response) => {
+		try {
+			const installedAddons = await readInstalledAddons(services);
+			res.json(installedAddons);
+		} catch (error) {
+			sendError(res, error);
+		}
+	});
+
+	app.get("/api/vps/status", async (_req: Request, res: Response) => {
+		try {
+			const status = await readVpsStatus(services);
+			res.json(status);
+		} catch (error) {
+			sendError(res, error);
+		}
+	});
+
+	app.post("/api/triggers/preview", async (req: Request, res: Response) => {
+		try {
+			const { addonName, triggerName, inputs } = req.body as {
+				addonName?: string;
+				triggerName?: string;
+				inputs?: Record<string, string>;
+			};
+
+			if (!addonName || !triggerName) {
+				throw new Error("addonName and triggerName are required.");
+			}
+
+			const addons = await loadAddons(services.addonOptions);
+			const addon = getAddonByName(addons, addonName);
+			const trigger = getTriggerByName(addon.addon, triggerName);
+			const preview = prepareTriggerExecution({
+				trigger,
+				inputs,
+				snapshot: services.session.getSnapshot(),
+			});
+
+			res.json({
+				addonName: addon.addon.name,
+				triggerName: trigger.name,
+				commands: preview.commands,
+				warnings: preview.warnings,
+				referencedInputs: preview.referencedInputs,
+			});
+		} catch (error) {
+			sendError(res, error);
+		}
+	});
+
+	app.post("/api/triggers/run", async (req: Request, res: Response) => {
+		try {
+			const { addonName, triggerName, inputs } = req.body as {
+				addonName?: string;
+				triggerName?: string;
+				inputs?: Record<string, string>;
+			};
+
+			if (!addonName || !triggerName) {
+				throw new Error("addonName and triggerName are required.");
+			}
+
+			const addons = await loadAddons(services.addonOptions);
+			const addon = getAddonByName(addons, addonName);
+			const trigger = getTriggerByName(addon.addon, triggerName);
+			const prepared = prepareTriggerExecution({
+				trigger,
+				inputs,
+				snapshot: services.session.getSnapshot(),
+			});
+			const executionId = randomUUID();
+
+			void executePreparedCommands({
+				executionId,
+				addonName: addon.addon.name,
+				triggerName: trigger.name,
+				commands: prepared.commands,
+				session: services.session,
+				events: services.events,
+			}).catch((error) => {
+				console.error(errorMessage(error));
+			});
+
+			res.status(202).json({
+				accepted: true,
+				executionId,
+				warnings: prepared.warnings,
+			});
+		} catch (error) {
+			sendError(res, error);
+		}
+	});
+
+	if (fs.existsSync(publicDir)) {
+		app.use(express.static(publicDir));
+	}
+
+	app.get(/.*/, (_req: Request, res: Response) => {
+		const indexPath = path.join(publicDir, "index.html");
+		if (!fs.existsSync(indexPath)) {
+			res.status(404).json({ message: "UI not built yet." });
+			return;
+		}
+
+		res.sendFile(indexPath);
+	});
+
+	return app;
 }
 
 export async function startServer(options: StartServerOptions = {}): Promise<StartedServer> {
-    const host = options.host || "127.0.0.1";
-    const requestedPort = options.preferredPort || DEFAULT_PORT;
-    const port = (await findAvailablePort(requestedPort, MAX_PORT, host)) ?? requestedPort;
-    const app = createApp();
-    const server = http.createServer(app);
+	const host = options.host || "127.0.0.1";
+	const requestedPort = options.preferredPort || DEFAULT_PORT;
+	const port = (await findAvailablePort(requestedPort, MAX_PORT, host)) ?? requestedPort;
+	const services: AppServices = {
+		session: new SessionStore(),
+		events: new EventStreamHub(),
+		addonOptions: options.addonOptions,
+	};
+	const app = createApp(services);
+	const server = http.createServer(app);
+	const shutdown = async () => {
+		await services.session.disconnect();
+		services.events.close();
+		await new Promise<void>((resolve) => {
+			server.close(() => resolve());
+		});
+	};
+	let closing = false;
+	const handleSignal = () => {
+		if (closing) {
+			return;
+		}
 
-    await new Promise<void>((resolve, reject) => {
-        server.once("error", reject);
-        server.listen(port, host, () => resolve());
-    });
+		closing = true;
+		void shutdown().finally(() => {
+			process.exit(0);
+		});
+	};
 
-    const url = getBaseUrl(server, host);
-    console.log(`VPS Manager listening on ${url}`);
+	await new Promise<void>((resolve, reject) => {
+		server.once("error", reject);
+		server.listen(port, host, () => resolve());
+	});
 
-    if (options.autoOpen !== false) {
-        await open(url);
-    }
+	process.once("SIGINT", handleSignal);
+	process.once("SIGTERM", handleSignal);
 
-    return {
-        app,
-        server,
-        host,
-        port,
-        url,
-        async close() {
-            await new Promise<void>((resolve, reject) => {
-                server.close((error) => {
-                    if (error) {
-                        reject(error);
-                        return;
-                    }
+	const url = getBaseUrl(server, host);
+	console.log(`VPS Manager listening on ${url}`);
 
-                    resolve();
-                });
-            });
-        },
-    };
+	if (options.autoOpen !== false) {
+		const { default: openBrowser } = await import("open");
+		await openBrowser(url);
+	}
+
+	return {
+		app,
+		server,
+		host,
+		port,
+		url,
+		async close() {
+			process.removeListener("SIGINT", handleSignal);
+			process.removeListener("SIGTERM", handleSignal);
+			await services.session.disconnect();
+			services.events.close();
+			await new Promise<void>((resolve, reject) => {
+				server.close((error) => {
+					if (error) {
+						reject(error);
+						return;
+					}
+
+					resolve();
+				});
+			});
+		},
+	};
 }

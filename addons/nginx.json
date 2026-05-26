@@ -1,0 +1,109 @@
+{
+	"name": "nginx",
+	"version": "1.0.0",
+	"description": "Instalacao e gerenciamento basico do nginx para Ubuntu e Debian.",
+	"triggers": [
+		{
+			"name": "install",
+			"command": ["sudo apt update && sudo apt upgrade -y", "sudo apt install -y nginx", "sudo systemctl start nginx", "sudo systemctl enable nginx"]
+		},
+		{
+			"name": "ufw allow",
+			"command": ["sudo ufw allow 'Nginx Full'", "sudo ufw reload"]
+		},
+		{
+			"name": "uninstall",
+			"command": ["sudo apt remove -y nginx", "sudo apt autoremove -y"]
+		},
+		{
+			"name": "status",
+			"command": ["sudo systemctl status nginx --no-pager"]
+		},
+		{
+			"name": "restart",
+			"command": ["sudo systemctl restart nginx"]
+		},
+		{
+			"name": "reload",
+			"command": ["sudo systemctl reload nginx"]
+		},
+		{
+			"name": "enable",
+			"command": ["sudo systemctl enable nginx"]
+		},
+		{
+			"name": "disable",
+			"command": ["sudo systemctl disable nginx"]
+		},
+		{
+			"name": "list sites",
+			"command": ["ls /etc/nginx/sites-available/"]
+		},
+		{
+			"name": "list enabled sites",
+			"command": ["ls /etc/nginx/sites-enabled/"]
+		},
+		{
+			"name": "create site",
+			"command": [
+				"printf '%s\n' '{content}' | sudo tee /etc/nginx/sites-available/{domain} >/dev/null",
+				"sudo ln -sf /etc/nginx/sites-available/{domain} /etc/nginx/sites-enabled/{domain}",
+				"sudo systemctl reload nginx"
+			],
+			"input": [
+				{
+					"name": "domain",
+					"type": "text",
+					"placeholder": "example.com"
+				},
+				{
+					"name": "content",
+					"type": "text",
+					"placeholder": "server {\n    listen 80;\n    server_name example.com;\n\n    location / {\n        root /var/www/html;\n        index index.html;\n    }\n}"
+				}
+			]
+		},
+		{
+			"name": "delete site",
+			"command": ["sudo rm -f /etc/nginx/sites-available/{domain}", "sudo rm -f /etc/nginx/sites-enabled/{domain}", "sudo systemctl reload nginx"],
+			"input": [
+				{
+					"name": "domain",
+					"type": "text",
+					"placeholder": "example.com"
+				}
+			]
+		},
+		{
+			"name": "read site",
+			"command": ["cat /etc/nginx/sites-available/{domain}"],
+			"input": [
+				{
+					"name": "domain",
+					"type": "text",
+					"placeholder": "example.com"
+				}
+			]
+		},
+		{
+			"name": "edit site",
+			"command": ["printf '%s\n' '{content}' | sudo tee /etc/nginx/sites-available/{domain} >/dev/null", "sudo systemctl reload nginx"],
+			"input": [
+				{
+					"name": "domain",
+					"type": "text",
+					"placeholder": "example.com"
+				},
+				{
+					"name": "content",
+					"type": "text",
+					"placeholder": "server {\n    listen 80;\n    server_name example.com;\n\n    location / {\n        root /var/www/html;\n        index index.html;\n    }\n}"
+				}
+			]
+		},
+		{
+			"name": "test configuration",
+			"command": ["sudo nginx -t"]
+		}
+	]
+}
