@@ -7,7 +7,7 @@ import net from "net";
 import type { ClientChannel } from "ssh2";
 import { EventStreamHub } from "./core/events";
 import { getAddonByName, getTriggerByName, loadAddons, type LoadAddonsOptions } from "./core/addon";
-import { prepareTriggerExecution, executePreparedCommands } from "./core/executor";
+import { prepareTriggerExecution, executePreparedCommands, executePreparedCommandsWithOutput } from "./core/executor";
 import { getPublicDir } from "./core/paths";
 import { SessionStore, type ConnectSessionInput, type RemoteExecClient } from "./core/session";
 
@@ -332,6 +332,50 @@ export function createApp(services: AppServices) {
 				commands: preview.commands,
 				warnings: preview.warnings,
 				referencedInputs: preview.referencedInputs,
+			});
+		} catch (error) {
+			sendError(res, error);
+		}
+	});
+
+	app.post("/api/triggers/execute", async (req: Request, res: Response) => {
+		try {
+			const { addonName, triggerName, inputs } = req.body as {
+				addonName?: string;
+				triggerName?: string;
+				inputs?: Record<string, string>;
+			};
+
+			if (!addonName || !triggerName) {
+				throw new Error("addonName and triggerName are required.");
+			}
+
+			const addons = await loadAddons(services.addonOptions);
+			const addon = getAddonByName(addons, addonName);
+			const trigger = getTriggerByName(addon.addon, triggerName);
+			const prepared = prepareTriggerExecution({
+				trigger,
+				inputs,
+				snapshot: services.session.getSnapshot(),
+			});
+			const executionId = randomUUID();
+			const result = await executePreparedCommandsWithOutput({
+				executionId,
+				addonName: addon.addon.name,
+				triggerName: trigger.name,
+				commands: prepared.commands,
+				session: services.session,
+			});
+
+			res.json({
+				executionId,
+				addonName: addon.addon.name,
+				triggerName: trigger.name,
+				commands: prepared.commands,
+				warnings: prepared.warnings,
+				outputs: result.outputs,
+				stdout: result.stdout,
+				stderr: result.stderr,
 			});
 		} catch (error) {
 			sendError(res, error);

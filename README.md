@@ -1,6 +1,6 @@
 # @ismael1361/vps-manager
 
-CLI em Node.js para subir um painel local em localhost e gerenciar VPS Linux por SSH com base em add-ons descritos em JSON.
+CLI em Node.js para subir um painel local em localhost e gerenciar VPS Linux por SSH com base em add-ons descritos em XML.
 
 ## Estado atual
 
@@ -31,26 +31,25 @@ npm run cli -- --port 3010 --host 127.0.0.1 --no-open
 
 O parser valida estritamente o schema abaixo:
 
-```json
-{
-  "name": "nginx",
-  "version": "1.0.0",
-  "description": "...",
-  "triggers": [
-    {
-      "name": "install",
-      "command": ["sudo apt update"],
-      "input": [
-        {
-          "name": "domain",
-          "type": "text",
-          "placeholder": "example.com"
-        }
-      ]
-    }
-  ]
-}
+```xml
+<addon>
+  <name>nginx</name>
+  <version>1.0.0</version>
+  <description>...</description>
+  <triggers>
+    <trigger event="install">
+      <actions>
+        <command>sudo apt update</command>
+      </actions>
+      <inputs>
+        <input name="domain" type="text" placeholder="example.com" />
+      </inputs>
+    </trigger>
+  </triggers>
+</addon>
 ```
+
+O loader aceita arquivos XML com extensao .xml e, por compatibilidade local, tambem arquivos XML sem extensao dentro da pasta addons.
 
 ## Limites intencionais da V1
 

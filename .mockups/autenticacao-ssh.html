@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>VPS Manager - SSH Authentication</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-fixed": "#410005",
+                        "tertiary-container": "#fc7c78",
+                        "on-primary-fixed-variant": "#005236",
+                        "tertiary-fixed-dim": "#ffb3af",
+                        "surface": "#0e1511",
+                        "error-container": "#93000a",
+                        "on-tertiary": "#650911",
+                        "inverse-primary": "#006c49",
+                        "inverse-surface": "#dde4dd",
+                        "secondary-fixed-dim": "#adc6ff",
+                        "on-surface": "#dde4dd",
+                        "primary-fixed-dim": "#4edea3",
+                        "surface-container-low": "#161d19",
+                        "outline": "#86948a",
+                        "on-surface-variant": "#bbcabf",
+                        "on-tertiary-container": "#711419",
+                        "background": "#0e1511",
+                        "error": "#ffb4ab",
+                        "on-secondary-fixed": "#001a42",
+                        "on-primary-fixed": "#002113",
+                        "surface-dim": "#0e1511",
+                        "surface-container-lowest": "#09100c",
+                        "surface-bright": "#343b36",
+                        "on-secondary-container": "#e6ecff",
+                        "on-error": "#690005",
+                        "on-error-container": "#ffdad6",
+                        "on-primary-container": "#00422b",
+                        "on-secondary": "#002e6a",
+                        "on-background": "#dde4dd",
+                        "outline-variant": "#3c4a42",
+                        "surface-container": "#1a211d",
+                        "primary": "#4edea3",
+                        "on-secondary-fixed-variant": "#004395",
+                        "primary-container": "#10b981",
+                        "primary-fixed": "#6ffbbe",
+                        "secondary-container": "#0566d9",
+                        "secondary": "#adc6ff",
+                        "surface-variant": "#2f3632",
+                        "surface-tint": "#4edea3",
+                        "tertiary": "#ffb3af",
+                        "surface-container-highest": "#2f3632",
+                        "tertiary-fixed": "#ffdad7",
+                        "surface-container-high": "#242c27",
+                        "on-tertiary-fixed-variant": "#842225",
+                        "secondary-fixed": "#d8e2ff",
+                        "on-primary": "#003824",
+                        "inverse-on-surface": "#2b322d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "xs": "4px",
+                        "margin-mobile": "16px",
+                        "md": "16px",
+                        "sm": "8px",
+                        "lg": "24px",
+                        "unit": "4px",
+                        "gutter": "20px",
+                        "margin-desktop": "32px",
+                        "xl": "40px"
+                    },
+                    "fontFamily": {
+                        "headline-sm": [
+                            "Geist"
+                        ],
+                        "headline-lg": [
+                            "Geist"
+                        ],
+                        "headline-lg-mobile": [
+                            "Geist"
+                        ],
+                        "label-caps": [
+                            "JetBrains Mono"
+                        ],
+                        "body-md": [
+                            "Geist"
+                        ],
+                        "code-block": [
+                            "JetBrains Mono"
+                        ],
+                        "headline-md": [
+                            "Geist"
+                        ],
+                        "body-lg": [
+                            "Geist"
+                        ]
+                    },
+                    "fontSize": {
+                        "headline-sm": [
+                            "20px",
+                            {
+                                "lineHeight": "28px",
+                                "fontWeight": "600"
+                            }
+                        ],
+                        "headline-lg": [
+                            "30px",
+                            {
+                                "lineHeight": "36px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "600"
+                            }
+                        ],
+                        "headline-lg-mobile": [
+                            "24px",
+                            {
+                                "lineHeight": "32px",
+                                "fontWeight": "600"
+                            }
+                        ],
+                        "label-caps": [
+                            "11px",
+                            {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "700"
+                            }
+                        ],
+                        "body-md": [
+                            "14px",
+                            {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                            }
+                        ],
+                        "code-block": [
+                            "13px",
+                            {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                            }
+                        ],
+                        "headline-md": [
+                            "24px",
+                            {
+                                "lineHeight": "32px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "600"
+                            }
+                        ],
+                        "body-lg": [
+                            "16px",
+                            {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                            }
+                        ]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col">
+    <!-- TopAppBar (Modified for Disconnected state based on instructions) -->
+    <header
+        class="bg-surface-container dark:bg-surface-container docked full-width top-0 border-b border-outline-variant flat no shadows flex justify-between items-center w-full px-md h-14 z-50">
+        <div class="flex items-center gap-sm">
+            <span
+                class="font-label-caps text-label-caps tracking-widest text-primary dark:text-primary">VPS_MANAGER</span>
+        </div>
+        <div class="flex items-center gap-md">
+            <div class="flex items-center gap-xs text-error font-code-block text-code-block">
+                <span class="w-2 h-2 rounded-full bg-error inline-block"></span>
+                Disconnected
+            </div>
+            <div class="flex items-center gap-xs">
+                <span
+                    class="material-symbols-outlined text-on-surface-variant hover:bg-surface-variant transition-colors p-sm rounded cursor-pointer"
+                    style="font-variation-settings: 'FILL' 0;">sensors</span>
+                <span
+                    class="material-symbols-outlined text-on-surface-variant hover:bg-surface-variant transition-colors p-sm rounded cursor-pointer"
+                    style="font-variation-settings: 'FILL' 0;">settings</span>
+            </div>
+        </div>
+    </header>
+    <!-- Main Content Area -->
+    <main
+        class="flex-grow flex items-center justify-center p-margin-mobile md:p-margin-desktop relative overflow-hidden">
+        <!-- Ambient Grid Background -->
+        <div class="absolute inset-0 pointer-events-none opacity-10"
+            style="background-image: linear-gradient(to right, #3c4a42 1px, transparent 1px), linear-gradient(to bottom, #3c4a42 1px, transparent 1px); background-size: 40px 40px;">
+        </div>
+        <!-- Central Layout Container -->
+        <div class="w-full max-w-[1280px] grid grid-cols-1 md:grid-cols-12 gap-lg relative z-10 items-start mt-lg">
+            <!-- Auth Form Card -->
+            <div
+                class="md:col-span-8 lg:col-span-7 bg-surface-container-low border border-outline-variant rounded-xl shadow-lg p-lg flex flex-col gap-lg">
+                <div>
+                    <h1 class="font-headline-md text-headline-md text-on-surface">New Connection</h1>
+                    <p class="font-body-md text-body-md text-on-surface-variant mt-xs">Establish a secure SSH tunnel to
+                        your server.</p>
+                </div>
+                <form class="flex flex-col gap-md">
+                    <!-- Host & Port Row -->
+                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-md">
+                        <div class="sm:col-span-3">
+                            <label
+                                class="block font-label-caps text-label-caps text-on-surface-variant mb-xs">Host</label>
+                            <div
+                                class="relative flex items-center bg-surface border border-outline-variant rounded focus-within:border-primary transition-colors">
+                                <span class="material-symbols-outlined text-outline-variant pl-sm"
+                                    style="font-variation-settings: 'FILL' 0;">dns</span>
+                                <input
+                                    class="w-full bg-transparent border-none text-on-surface font-code-block text-code-block focus:ring-0 p-sm placeholder-outline-variant"
+                                    placeholder="192.168.1.100 or domain.com" type="text" />
+                            </div>
+                        </div>
+                        <div class="sm:col-span-1">
+                            <label
+                                class="block font-label-caps text-label-caps text-on-surface-variant mb-xs">Port</label>
+                            <input
+                                class="w-full bg-surface border border-outline-variant rounded text-on-surface font-code-block text-code-block focus:border-primary focus:ring-0 p-sm"
+                                type="number" value="22" />
+                        </div>
+                    </div>
+                    <!-- User Input -->
+                    <div>
+                        <label class="block font-label-caps text-label-caps text-on-surface-variant mb-xs">User</label>
+                        <div
+                            class="relative flex items-center bg-surface border border-outline-variant rounded focus-within:border-primary transition-colors">
+                            <span class="material-symbols-outlined text-outline-variant pl-sm"
+                                style="font-variation-settings: 'FILL' 0;">person</span>
+                            <input
+                                class="w-full bg-transparent border-none text-on-surface font-code-block text-code-block focus:ring-0 p-sm placeholder-outline-variant"
+                                placeholder="root" type="text" value="root" />
+                        </div>
+                    </div>
+                    <!-- Auth Method Toggle -->
+                    <div class="mt-sm">
+                        <label
+                            class="block font-label-caps text-label-caps text-on-surface-variant mb-sm">Authentication
+                            Method</label>
+                        <div class="flex bg-surface rounded p-xs border border-outline-variant w-max">
+                            <button
+                                class="px-md py-sm rounded font-label-caps text-label-caps bg-surface-variant text-on-surface transition-colors"
+                                id="btn-password" onclick="toggleAuth('password')" type="button">Password</button>
+                            <button
+                                class="px-md py-sm rounded font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface transition-colors"
+                                id="btn-ssh" onclick="toggleAuth('ssh')" type="button">SSH Key</button>
+                        </div>
+                    </div>
+                    <!-- Password Field (Default) -->
+                    <div id="auth-password">
+                        <label
+                            class="block font-label-caps text-label-caps text-on-surface-variant mb-xs">Password</label>
+                        <div
+                            class="relative flex items-center bg-surface border border-outline-variant rounded focus-within:border-primary transition-colors">
+                            <span class="material-symbols-outlined text-outline-variant pl-sm"
+                                style="font-variation-settings: 'FILL' 0;">key</span>
+                            <input
+                                class="w-full bg-transparent border-none text-on-surface font-code-block text-code-block focus:ring-0 p-sm placeholder-outline-variant"
+                                placeholder="••••••••" type="password" />
+                            <button class="pr-sm text-outline-variant hover:text-on-surface focus:outline-none"
+                                type="button">
+                                <span class="material-symbols-outlined"
+                                    style="font-variation-settings: 'FILL' 0;">visibility</span>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- SSH Key Field (Hidden by default) -->
+                    <div class="hidden flex-col gap-xs" id="auth-ssh">
+                        <label class="block font-label-caps text-label-caps text-on-surface-variant mb-xs">Private Key
+                            (Ed25519 / RSA)</label>
+                        <textarea
+                            class="w-full bg-surface border border-outline-variant rounded text-on-surface font-code-block text-code-block focus:border-primary focus:ring-0 p-sm placeholder-outline-variant resize-none"
+                            placeholder="-----BEGIN OPENSSH PRIVATE KEY-----
+...
+-----END OPENSSH PRIVATE KEY-----" rows="4"></textarea>
+                        <div class="flex items-center gap-sm mt-xs">
+                            <label class="flex items-center cursor-pointer gap-sm">
+                                <input class="hidden" type="file" />
+                                <span
+                                    class="bg-surface-variant hover:bg-surface-bright text-on-surface font-label-caps text-label-caps px-md py-sm rounded border border-outline-variant transition-colors flex items-center gap-xs">
+                                    <span class="material-symbols-outlined text-[16px]"
+                                        style="font-variation-settings: 'FILL' 0;">upload_file</span>
+                                    Upload Key File
+                                </span>
+                            </label>
+                            <span class="font-body-md text-body-md text-on-surface-variant">or paste directly
+                                above.</span>
+                        </div>
+                    </div>
+                    <!-- Action Button -->
+                    <button
+                        class="mt-lg w-full bg-primary text-on-primary-container font-label-caps text-label-caps py-md rounded hover:bg-primary-fixed transition-colors flex justify-center items-center gap-sm uppercase tracking-wider"
+                        type="submit">
+                        <span class="material-symbols-outlined"
+                            style="font-variation-settings: 'FILL' 1;">terminal</span>
+                        Connect to Server
+                    </button>
+                </form>
+            </div>
+            <!-- Onboarding Tips Side Panel -->
+            <div class="md:col-span-4 lg:col-span-5 flex flex-col gap-md">
+                <div class="bg-surface-container-high border border-outline-variant rounded-xl p-md">
+                    <div class="flex items-center gap-sm mb-md pb-sm border-b border-outline-variant">
+                        <span class="material-symbols-outlined text-secondary"
+                            style="font-variation-settings: 'FILL' 1;">lightbulb</span>
+                        <h2 class="font-label-caps text-label-caps text-on-surface uppercase tracking-wider">Onboarding
+                            Tips</h2>
+                    </div>
+                    <ul class="flex flex-col gap-md">
+                        <li class="flex gap-sm items-start">
+                            <span class="material-symbols-outlined text-outline-variant text-[18px] mt-xs"
+                                style="font-variation-settings: 'FILL' 0;">admin_panel_settings</span>
+                            <div>
+                                <h3 class="font-body-md text-body-md font-semibold text-on-surface">User Context</h3>
+                                <p class="font-body-md text-body-md text-on-surface-variant mt-xs leading-relaxed">For
+                                    full management capabilities, connect as <code
+                                        class="bg-surface px-1 py-0.5 rounded text-secondary font-code-block text-code-block">root</code>
+                                    or a user with NOPASSWD sudoers configured.</p>
+                            </div>
+                        </li>
+                        <li class="flex gap-sm items-start">
+                            <span class="material-symbols-outlined text-outline-variant text-[18px] mt-xs"
+                                style="font-variation-settings: 'FILL' 0;">security</span>
+                            <div>
+                                <h3 class="font-body-md text-body-md font-semibold text-on-surface">Authentication Best
+                                    Practices</h3>
+                                <p class="font-body-md text-body-md text-on-surface-variant mt-xs leading-relaxed">We
+                                    strongly recommend using Ed25519 SSH keys over password authentication for enhanced
+                                    security.</p>
+                            </div>
+                        </li>
+                        <li class="flex gap-sm items-start">
+                            <span class="material-symbols-outlined text-outline-variant text-[18px] mt-xs"
+                                style="font-variation-settings: 'FILL' 0;">network_ping</span>
+                            <div>
+                                <h3 class="font-body-md text-body-md font-semibold text-on-surface">Port Configuration
+                                </h3>
+                                <p class="font-body-md text-body-md text-on-surface-variant mt-xs leading-relaxed">
+                                    Default SSH port is 22. If your provider uses a custom port, update it before
+                                    attempting connection.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                <!-- Technical flourish illustration -->
+                <div
+                    class="bg-surface-container border border-outline-variant rounded-xl p-md opacity-70 hidden lg:block overflow-hidden relative min-h-[120px]">
+                    <div
+                        class="absolute inset-0 p-sm font-code-block text-code-block text-[10px] leading-tight text-outline opacity-50 pointer-events-none select-none">
+                        &gt; ssh root@192.168.1.100<br />
+                        The authenticity of host '192.168.1.100 (192.168.1.100)' can't be established.<br />
+                        ED25519 key fingerprint is SHA256:xx/yyyy...<br />
+                        This key is not known by any other names<br />
+                        Are you sure you want to continue connecting (yes/no/[fingerprint])? yes<br />
+                        Warning: Permanently added '192.168.1.100' (ED25519) to the list of known hosts.<br />
+                        Welcome to Ubuntu 24.04 LTS (GNU/Linux 6.8.0-31-generic x86_64)<br />
+                        Last login: Wed Oct 25 10:15:32 2023 from 10.0.0.5
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script>
+        function toggleAuth(method) {
+            const pwdSection = document.getElementById('auth-password');
+            const sshSection = document.getElementById('auth-ssh');
+            const btnPwd = document.getElementById('btn-password');
+            const btnSsh = document.getElementById('btn-ssh');
+
+            if (method === 'password') {
+                pwdSection.classList.remove('hidden');
+                sshSection.classList.add('hidden');
+                sshSection.classList.remove('flex');
+
+                btnPwd.classList.add('bg-surface-variant', 'text-on-surface');
+                btnPwd.classList.remove('text-on-surface-variant');
+
+                btnSsh.classList.remove('bg-surface-variant', 'text-on-surface');
+                btnSsh.classList.add('text-on-surface-variant');
+            } else {
+                pwdSection.classList.add('hidden');
+                sshSection.classList.remove('hidden');
+                sshSection.classList.add('flex');
+
+                btnSsh.classList.add('bg-surface-variant', 'text-on-surface');
+                btnSsh.classList.remove('text-on-surface-variant');
+
+                btnPwd.classList.remove('bg-surface-variant', 'text-on-surface');
+                btnPwd.classList.add('text-on-surface-variant');
+            }
+        }
+    </script>
+</body>
+
+</html>

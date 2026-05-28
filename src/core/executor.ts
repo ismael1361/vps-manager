@@ -24,6 +24,20 @@ export interface ExecutePreparedCommandsOptions {
 	events?: Pick<EventStreamHub, "emit">;
 }
 
+export interface CapturedCommandOutput {
+	command: string;
+	stdout: string;
+	stderr: string;
+	code: number | null;
+	signal?: string;
+}
+
+export interface CapturedPreparedCommandsResult {
+	outputs: CapturedCommandOutput[];
+	stdout: string;
+	stderr: string;
+}
+
 interface CommandResult {
 	stdout: string;
 	stderr: string;
@@ -94,15 +108,34 @@ function assessCommandPlan(commands: string[], snapshot?: SessionSnapshot) {
 	return warnings;
 }
 
+function validateTriggerInputs(trigger: AddonTriggerDefinition, inputs: Record<string, string>) {
+	for (const inputDefinition of trigger.input || []) {
+		if (inputs[inputDefinition.name] === undefined) {
+			throw new Error(`Missing required input "${inputDefinition.name}".`);
+		}
+
+		if (!inputDefinition.validation) {
+			continue;
+		}
+
+		let expression: RegExp;
+		try {
+			expression = new RegExp(inputDefinition.validation);
+		} catch (error) {
+			throw new Error(`Invalid validation pattern for input "${inputDefinition.name}": ${error instanceof Error ? error.message : String(error)}`);
+		}
+
+		if (!expression.test(inputs[inputDefinition.name])) {
+			throw new Error(`Input "${inputDefinition.name}" does not match the required format.`);
+		}
+	}
+}
+
 export function prepareTriggerExecution(options: PrepareTriggerExecutionOptions): PreparedTriggerExecution {
 	const inputs = options.inputs || {};
 	const referencedInputs = collectReferencedInputs(options.trigger);
 
-	for (const inputDefinition of options.trigger.input || []) {
-		if (inputs[inputDefinition.name] === undefined) {
-			throw new Error(`Missing required input "${inputDefinition.name}".`);
-		}
-	}
+	validateTriggerInputs(options.trigger, inputs);
 
 	for (const name of referencedInputs) {
 		if (inputs[name] === undefined) {
@@ -155,45 +188,81 @@ function runRemoteCommand(client: RemoteExecClient, command: string, events: Exe
 	});
 }
 
-export async function executePreparedCommands(options: ExecutePreparedCommandsOptions) {
+async function executeCommandSequence(options: ExecutePreparedCommandsOptions) {
 	const snapshot = options.session.getSnapshot();
 	assessCommandPlan(options.commands, snapshot);
 
-	try {
-		return await options.session.runExclusive(async (client) => {
-			options.events?.emit("execution:start", {
-				executionId: options.executionId,
-				addonName: options.addonName,
-				triggerName: options.triggerName,
-				commandCount: options.commands.length,
-			});
-
-			for (const [index, command] of options.commands.entries()) {
-				options.events?.emit("command:start", {
-					executionId: options.executionId,
-					index,
-					command,
-				});
-
-				const result = await runRemoteCommand(client, command, options.events, options.executionId, index);
-				options.events?.emit("command:close", {
-					executionId: options.executionId,
-					index,
-					code: result.code,
-					signal: result.signal,
-				});
-
-				if (result.code !== 0) {
-					throw new Error(`Command failed with exit code ${result.code ?? "unknown"}: ${command}`);
-				}
-			}
-
-			options.events?.emit("execution:complete", {
-				executionId: options.executionId,
-				addonName: options.addonName,
-				triggerName: options.triggerName,
-			});
+	return options.session.runExclusive(async (client) => {
+		options.events?.emit("execution:start", {
+			executionId: options.executionId,
+			addonName: options.addonName,
+			triggerName: options.triggerName,
+			commandCount: options.commands.length,
 		});
+
+		const outputs: CapturedCommandOutput[] = [];
+
+		for (const [index, command] of options.commands.entries()) {
+			options.events?.emit("command:start", {
+				executionId: options.executionId,
+				index,
+				command,
+			});
+
+			const result = await runRemoteCommand(client, command, options.events, options.executionId, index);
+			outputs.push({
+				command,
+				stdout: result.stdout,
+				stderr: result.stderr,
+				code: result.code,
+				signal: result.signal,
+			});
+
+			options.events?.emit("command:close", {
+				executionId: options.executionId,
+				index,
+				code: result.code,
+				signal: result.signal,
+			});
+
+			if (result.code !== 0) {
+				throw new Error(`Command failed with exit code ${result.code ?? "unknown"}: ${command}`);
+			}
+		}
+
+		options.events?.emit("execution:complete", {
+			executionId: options.executionId,
+			addonName: options.addonName,
+			triggerName: options.triggerName,
+		});
+
+		return outputs;
+	});
+}
+
+export async function executePreparedCommands(options: ExecutePreparedCommandsOptions) {
+	try {
+		await executeCommandSequence(options);
+	} catch (error) {
+		options.events?.emit("execution:error", {
+			executionId: options.executionId,
+			addonName: options.addonName,
+			triggerName: options.triggerName,
+			message: error instanceof Error ? error.message : String(error),
+		});
+		throw error;
+	}
+}
+
+export async function executePreparedCommandsWithOutput(options: ExecutePreparedCommandsOptions): Promise<CapturedPreparedCommandsResult> {
+	try {
+		const outputs = await executeCommandSequence(options);
+
+		return {
+			outputs,
+			stdout: outputs.map((entry) => entry.stdout).join(""),
+			stderr: outputs.map((entry) => entry.stderr).join(""),
+		};
 	} catch (error) {
 		options.events?.emit("execution:error", {
 			executionId: options.executionId,

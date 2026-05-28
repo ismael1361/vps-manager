@@ -5,3 +5,5 @@ src
 .gitignore
 .prettierrc.json
 tsconfig.json
+.*
+__*

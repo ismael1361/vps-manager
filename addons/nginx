@@ -1,0 +1,200 @@
+<addon>
+    <name>nginx</name>
+    <version>1.0.0</version>
+    <description>Manage Nginx server blocks (virtual hosts) on your VPS.</description>
+    <triggers>
+        <trigger event="install">
+            <actions>
+                <command>sudo apt update && sudo apt upgrade -y</command>
+                <command>sudo apt install -y nginx</command>
+                <command>sudo systemctl start nginx</command>
+                <command>sudo systemctl enable nginx</command>
+            </actions>
+        </trigger>
+        <trigger event="ufw_allow">
+            <actions>
+                <command>sudo ufw allow 'Nginx Full'</command>
+                <command>sudo ufw reload</command>
+            </actions>
+        </trigger>
+        <trigger event="uninstall">
+            <actions>
+                <command>sudo apt remove -y nginx</command>
+                <command>sudo apt autoremove -y</command>
+            </actions>
+        </trigger>
+        <trigger event="status">
+            <actions>
+                <command>sudo systemctl status nginx --no-pager</command>
+            </actions>
+        </trigger>
+        <trigger event="restart">
+            <actions>
+                <command>sudo systemctl restart nginx</command>
+            </actions>
+        </trigger>
+        <trigger event="reload">
+            <actions>
+                <command>sudo systemctl reload nginx</command>
+            </actions>
+        </trigger>
+        <trigger event="enable">
+            <actions>
+                <command>sudo systemctl enable nginx</command>
+            </actions>
+        </trigger>
+        <trigger event="disable">
+            <actions>
+                <command>sudo systemctl disable nginx</command>
+            </actions>
+        </trigger>
+        <trigger event="list_sites">
+            <actions>
+                <command>ls /etc/nginx/sites-available</command>
+            </actions>
+        </trigger>
+        <trigger event="list_enabled_sites">
+            <actions>
+                <command>ls /etc/nginx/sites-enabled</command>
+            </actions>
+        </trigger>
+        <trigger event="create_site">
+            <actions>
+                <command>echo "{content}" | sudo tee /etc/nginx/sites-available/{domain}</command>
+                <command>sudo ln -s /etc/nginx/sites-available/{domain} /etc/nginx/sites-enabled/</command>
+                <command>sudo nginx -t</command>
+                <command>sudo systemctl reload nginx</command>
+            </actions>
+            <inputs>
+                <input name="domain" type="text"
+                    validation="^(https?:\\/\\/)?([\\da-z\\.-]+)\\.([a-z\\.]{2,6})([\\/\\w \\.-]*)*\\/?$" />
+                <input name="content" type="text" />
+            </inputs>
+        </trigger>
+        <trigger event="delete_site">
+            <actions>
+                <command>sudo rm -f /etc/nginx/sites-available/{domain}</command>
+                <command>sudo rm -f /etc/nginx/sites-enabled/{domain}</command>
+                <command>sudo nginx -t</command>
+                <command>sudo systemctl reload nginx</command>
+            </actions>
+            <inputs>
+                <input name="domain" type="text"
+                    validation="^(https?:\\/\\/)?([\\da-z\\.-]+)\\.([a-z\\.]{2,6})([\\/\\w \\.-]*)*\\/?$" />
+            </inputs>
+        </trigger>
+        <trigger event="read_site">
+            <actions>
+                <command>cat /etc/nginx/sites-available/{domain}</command>
+            </actions>
+            <inputs>
+                <input name="domain" type="text"
+                    validation="^(https?:\\/\\/)?([\\da-z\\.-]+)\\.([a-z\\.]{2,6})([\\/\\w \\.-]*)*\\/?$" />
+            </inputs>
+        </trigger>
+        <trigger event="edit_site">
+            <actions>
+                <command>echo "{content}" | sudo tee /etc/nginx/sites-available/{domain}</command>
+                <command>sudo nginx -t</command>
+                <command>sudo systemctl reload nginx</command>
+            </actions>
+            <inputs>
+                <input name="domain" type="text"
+                    validation="^(https?:\\/\\/)?([\\da-z\\.-]+)\\.([a-z\\.]{2,6})([\\/\\w \\.-]*)*\\/?$" />
+                <input name="content" type="text" />
+            </inputs>
+        </trigger>
+        <trigger event="test_configuration">
+            <actions>
+                <command>sudo nginx -t</command>
+            </actions>
+        </trigger>
+    </triggers>
+    <views>
+        <view name="Dashboard">
+            <script>
+                let sites = [];
+                executeTrigger("list_sites").then(result => {
+                    sites = result.split("\n").filter(site => site.trim() !== "");
+                    render();
+                });
+            </script>
+
+            <template>
+                <h1>Nginx Dashboard</h1>
+                <p>Use the triggers to manage your Nginx installation and sites.</p>
+                <h2>Installed Sites</h2>
+                <ul>
+                    {sites.map(site => `<li>${site}</li>`).join("")}
+                </ul>
+            </template>
+
+            <style>
+                button,
+                a {
+                    display: block;
+                    margin-bottom: 1em;
+
+                }
+            </style>
+        </view>
+        <view name="Create Site">
+            <script>
+                async function createSite(domain, content) {
+                    await executeTrigger('create_site', { domain, content });
+                }
+
+                async function submitForm(event) {
+                    event.preventDefault();
+                    const domain = document.getElementById('domain').value;
+                    const content = document.getElementById('content').value;
+                    await createSite(domain, content);
+                }
+            </script>
+            <template>
+                <h1>Create Nginx Site</h1>
+                <p>Use the form below to create a new Nginx site.</p>
+                <form onsubmit="submitForm.bind(this)(event)">
+                    <label for="domain">Domain:</label>
+                    <input type="text" id="domain" name="domain" placeholder="example.com" required>
+                    <br>
+                    <label for="content">Configuration:</label>
+                    <textarea id="content" name="content" placeholder="server {
+    listen 80;
+    server_name example.com;
+
+    location / {
+        root /var/www/html;
+        index index.html;
+    }
+}" required></textarea>
+                    <br>
+                    <button type="submit">Create Site</button>
+                </form>
+            </template>
+            <style>
+                form {
+                    display: flex;
+                    flex-direction: column;
+                    max-width: 400px;
+                }
+
+                label {
+                    margin-top: 1em;
+                }
+
+                input,
+                textarea {
+                    width: 100%;
+                    padding: 0.5em;
+                    margin-top: 0.5em;
+                }
+
+                button {
+                    margin-top: 1em;
+                    padding: 0.5em;
+                }
+            </style>
+        </view>
+    </views>
+</addon>

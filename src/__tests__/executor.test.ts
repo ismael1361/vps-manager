@@ -1,5 +1,5 @@
 import { EventEmitter } from "events";
-import { executePreparedCommands, prepareTriggerExecution } from "../core/executor";
+import { executePreparedCommands, executePreparedCommandsWithOutput, prepareTriggerExecution } from "../core/executor";
 
 class FakeStream extends EventEmitter {
 	stderr = new EventEmitter();
@@ -75,6 +75,27 @@ describe("executor", () => {
 		).toThrow(/Interactive commands/);
 	});
 
+	it("validates inputs against regex definitions", () => {
+		expect(() =>
+			prepareTriggerExecution({
+				trigger: {
+					name: "create site",
+					command: ["echo {domain}"],
+					input: [{ name: "domain", type: "text", validation: "^[a-z0-9.-]+$" }],
+				},
+				inputs: { domain: "https://example.com" },
+				snapshot: {
+					connected: true,
+					busy: false,
+					capabilities: {
+						isRoot: true,
+						canUseSudoWithoutPassword: true,
+					},
+				},
+			}),
+		).toThrow(/does not match the required format/);
+	});
+
 	it("emits execution events in command order", async () => {
 		const events: Array<{ type: string; payload: any }> = [];
 		const fakeClient = {
@@ -122,5 +143,42 @@ describe("executor", () => {
 			"command:close",
 			"execution:complete",
 		]);
+	});
+
+	it("captures stdout and stderr for synchronous executions", async () => {
+		const fakeClient = {
+			exec(command: string, callback: (error: Error | undefined, stream?: FakeStream) => void) {
+				const stream = new FakeStream({ stdout: `out:${command}`, stderr: `err:${command}`, code: 0 });
+				callback(undefined, stream);
+				stream.start();
+			},
+		};
+
+		const result = await executePreparedCommandsWithOutput({
+			executionId: "exec-2",
+			addonName: "nginx",
+			triggerName: "status",
+			commands: ["echo nginx"],
+			session: {
+				getSnapshot() {
+					return {
+						connected: true,
+						busy: false,
+						capabilities: {
+							isRoot: true,
+							canUseSudoWithoutPassword: true,
+						},
+					};
+				},
+				async runExclusive(task) {
+					return task(fakeClient as any);
+				},
+			},
+		});
+
+		expect(result.stdout).toContain("out:echo nginx");
+		expect(result.stderr).toContain("err:echo nginx");
+		expect(result.outputs).toHaveLength(1);
+		expect(result.outputs[0].command).toBe("echo nginx");
 	});
 });

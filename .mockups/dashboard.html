@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>VPS Manager - Add-ons Dashboard</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-fixed": "#410005",
+                        "tertiary-container": "#fc7c78",
+                        "on-primary-fixed-variant": "#005236",
+                        "tertiary-fixed-dim": "#ffb3af",
+                        "surface": "#0e1511",
+                        "error-container": "#93000a",
+                        "on-tertiary": "#650911",
+                        "inverse-primary": "#006c49",
+                        "inverse-surface": "#dde4dd",
+                        "secondary-fixed-dim": "#adc6ff",
+                        "on-surface": "#dde4dd",
+                        "primary-fixed-dim": "#4edea3",
+                        "surface-container-low": "#161d19",
+                        "outline": "#86948a",
+                        "on-surface-variant": "#bbcabf",
+                        "on-tertiary-container": "#711419",
+                        "background": "#0e1511",
+                        "error": "#ffb4ab",
+                        "on-secondary-fixed": "#001a42",
+                        "on-primary-fixed": "#002113",
+                        "surface-dim": "#0e1511",
+                        "surface-container-lowest": "#09100c",
+                        "surface-bright": "#343b36",
+                        "on-secondary-container": "#e6ecff",
+                        "on-error": "#690005",
+                        "on-error-container": "#ffdad6",
+                        "on-primary-container": "#00422b",
+                        "on-secondary": "#002e6a",
+                        "on-background": "#dde4dd",
+                        "outline-variant": "#3c4a42",
+                        "surface-container": "#1a211d",
+                        "primary": "#4edea3",
+                        "on-secondary-fixed-variant": "#004395",
+                        "primary-container": "#10b981",
+                        "primary-fixed": "#6ffbbe",
+                        "secondary-container": "#0566d9",
+                        "secondary": "#adc6ff",
+                        "surface-variant": "#2f3632",
+                        "surface-tint": "#4edea3",
+                        "tertiary": "#ffb3af",
+                        "surface-container-highest": "#2f3632",
+                        "tertiary-fixed": "#ffdad7",
+                        "surface-container-high": "#242c27",
+                        "on-tertiary-fixed-variant": "#842225",
+                        "secondary-fixed": "#d8e2ff",
+                        "on-primary": "#003824",
+                        "inverse-on-surface": "#2b322d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "xs": "4px",
+                        "margin-mobile": "16px",
+                        "md": "16px",
+                        "sm": "8px",
+                        "lg": "24px",
+                        "unit": "4px",
+                        "gutter": "20px",
+                        "margin-desktop": "32px",
+                        "xl": "40px"
+                    },
+                    "fontFamily": {
+                        "headline-sm": [
+                            "Geist"
+                        ],
+                        "headline-lg": [
+                            "Geist"
+                        ],
+                        "headline-lg-mobile": [
+                            "Geist"
+                        ],
+                        "label-caps": [
+                            "JetBrains Mono"
+                        ],
+                        "body-md": [
+                            "Geist"
+                        ],
+                        "code-block": [
+                            "JetBrains Mono"
+                        ],
+                        "headline-md": [
+                            "Geist"
+                        ],
+                        "body-lg": [
+                            "Geist"
+                        ]
+                    },
+                    "fontSize": {
+                        "headline-sm": [
+                            "20px",
+                            {
+                                "lineHeight": "28px",
+                                "fontWeight": "600"
+                            }
+                        ],
+                        "headline-lg": [
+                            "30px",
+                            {
+                                "lineHeight": "36px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "600"
+                            }
+                        ],
+                        "headline-lg-mobile": [
+                            "24px",
+                            {
+                                "lineHeight": "32px",
+                                "fontWeight": "600"
+                            }
+                        ],
+                        "label-caps": [
+                            "11px",
+                            {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "700"
+                            }
+                        ],
+                        "body-md": [
+                            "14px",
+                            {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                            }
+                        ],
+                        "code-block": [
+                            "13px",
+                            {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                            }
+                        ],
+                        "headline-md": [
+                            "24px",
+                            {
+                                "lineHeight": "32px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "600"
+                            }
+                        ],
+                        "body-lg": [
+                            "16px",
+                            {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                            }
+                        ]
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            background-color: #020617;
+            /* Deepest layer */
+            color: #dde4dd;
+        }
+
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .bento-card {
+            background-color: #1e293b;
+            /* Surface */
+            border: 1px solid #334155;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .bento-card:hover {
+            background-color: #242c27;
+            border-color: #4edea3;
+            box-shadow: inset 0 0 10px rgba(78, 222, 163, 0.05);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #4edea3;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(78, 222, 163, 0.7);
+            }
+
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 6px rgba(78, 222, 163, 0);
+            }
+
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(78, 222, 163, 0);
+            }
+        }
+    </style>
+</head>
+
+<body class="flex min-h-screen">
+    <!-- SideNavBar -->
+    <nav
+        class="bg-surface-container-low dark:bg-surface-container-low text-primary dark:text-primary border-r border-outline-variant flat no shadows flex flex-col h-full py-lg px-md w-64 fixed left-0 top-0 z-40 hidden md:flex">
+        <div class="mb-xl">
+            <span class="font-headline-sm text-headline-sm font-bold text-on-surface">Root User</span>
+            <div class="font-body-md text-body-md text-on-surface-variant">vps-prod-01</div>
+        </div>
+        <div class="flex-1 space-y-sm">
+            <a class="flex items-center space-x-sm px-sm py-sm bg-secondary-container text-on-secondary-container rounded-lg font-bold"
+                href="#">
+                <span class="material-symbols-outlined" data-weight="fill"
+                    style="font-variation-settings: 'FILL' 1;">dashboard</span>
+                <span class="font-label-caps text-label-caps">Dashboard</span>
+            </a>
+            <a class="flex items-center space-x-sm px-sm py-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-variant transition-all duration-200 rounded-lg"
+                href="#">
+                <span class="material-symbols-outlined">terminal</span>
+                <span class="font-label-caps text-label-caps">Terminal</span>
+            </a>
+            <a class="flex items-center space-x-sm px-sm py-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-variant transition-all duration-200 rounded-lg"
+                href="#">
+                <span class="material-symbols-outlined">extension</span>
+                <span class="font-label-caps text-label-caps">Add-ons</span>
+            </a>
+            <a class="flex items-center space-x-sm px-sm py-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-variant transition-all duration-200 rounded-lg"
+                href="#">
+                <span class="material-symbols-outlined">settings</span>
+                <span class="font-label-caps text-label-caps">Settings</span>
+            </a>
+        </div>
+        <button
+            class="w-full bg-primary text-on-primary font-label-caps text-label-caps py-sm rounded-lg mb-xl hover:bg-primary-container transition-colors">
+            New Connection
+        </button>
+        <div class="space-y-sm mt-auto">
+            <a class="flex items-center space-x-sm px-sm py-xs text-on-surface-variant hover:text-on-surface transition-colors"
+                href="#">
+                <span class="material-symbols-outlined text-[18px]">help</span>
+                <span class="font-label-caps text-label-caps">Docs</span>
+            </a>
+            <a class="flex items-center space-x-sm px-sm py-xs text-on-surface-variant hover:text-on-surface transition-colors"
+                href="#">
+                <span class="material-symbols-outlined text-[18px]">logout</span>
+                <span class="font-label-caps text-label-caps">Logout</span>
+            </a>
+        </div>
+    </nav>
+    <!-- Main Content Area -->
+    <div class="flex-1 flex flex-col md:ml-64 w-full">
+        <!-- TopAppBar -->
+        <header
+            class="bg-surface-container dark:bg-surface-container text-primary dark:text-primary docked full-width top-0 border-b border-outline-variant flat no shadows flex justify-between items-center w-full px-md h-14 sticky z-30">
+            <div class="flex items-center space-x-md">
+                <span
+                    class="font-label-caps text-label-caps tracking-widest text-primary dark:text-primary md:hidden">VPS_MANAGER</span>
+                <!-- Mobile Nav Toggle Placeholder -->
+                <span class="material-symbols-outlined md:hidden text-on-surface cursor-pointer">menu</span>
+            </div>
+            <div class="flex items-center space-x-lg">
+                <div
+                    class="flex items-center space-x-sm bg-surface-container-high px-sm py-xs rounded-lg border border-outline-variant">
+                    <div class="status-dot"></div>
+                    <span class="font-code-block text-code-block text-on-surface">192.168.1.104</span>
+                </div>
+                <div class="flex space-x-sm text-on-surface-variant">
+                    <button class="hover:bg-surface-variant transition-colors p-xs rounded-lg"><span
+                            class="material-symbols-outlined">sensors</span></button>
+                    <button class="hover:bg-surface-variant transition-colors p-xs rounded-lg"><span
+                            class="material-symbols-outlined">settings</span></button>
+                </div>
+            </div>
+        </header>
+        <!-- Canvas -->
+        <main class="flex-1 p-margin-mobile md:p-margin-desktop overflow-y-auto max-w-[1280px] mx-auto w-full">
+            <div class="mb-lg">
+                <h1 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-xs">Add-ons
+                    Dashboard</h1>
+                <p class="font-body-md text-body-md text-on-surface-variant">Manage services and extensions for
+                    vps-prod-01.</p>
+            </div>
+            <div class="bento-grid">
+                <!-- Add-on Card: Nginx -->
+                <div class="bento-card rounded-xl p-md flex flex-col">
+                    <div class="flex justify-between items-start mb-sm">
+                        <div class="p-sm bg-surface-variant rounded-lg text-primary">
+                            <span class="material-symbols-outlined text-[24px]">dns</span>
+                        </div>
+                        <span
+                            class="font-code-block text-code-block text-on-surface-variant bg-surface-container-highest px-xs py-[2px] rounded">v1.24.0</span>
+                    </div>
+                    <h3 class="font-headline-sm text-headline-sm text-on-surface mb-xs">Nginx</h3>
+                    <p class="font-body-md text-body-md text-on-surface-variant mb-md flex-1">High-performance HTTP
+                        server and reverse proxy.</p>
+                    <button
+                        class="w-full font-label-caps text-label-caps py-sm border border-outline-variant text-on-surface rounded-lg hover:bg-surface-container-high transition-colors">
+                        Manage
+                    </button>
+                </div>
+                <!-- Add-on Card: Docker -->
+                <div class="bento-card rounded-xl p-md flex flex-col">
+                    <div class="flex justify-between items-start mb-sm">
+                        <div class="p-sm bg-surface-variant rounded-lg text-secondary">
+                            <span class="material-symbols-outlined text-[24px]">view_in_ar</span>
+                        </div>
+                        <span
+                            class="font-code-block text-code-block text-on-surface-variant bg-surface-container-highest px-xs py-[2px] rounded">v24.0.5</span>
+                    </div>
+                    <h3 class="font-headline-sm text-headline-sm text-on-surface mb-xs">Docker</h3>
+                    <p class="font-body-md text-body-md text-on-surface-variant mb-md flex-1">Containerization platform
+                        for application deployment.</p>
+                    <button
+                        class="w-full font-label-caps text-label-caps py-sm border border-outline-variant text-on-surface rounded-lg hover:bg-surface-container-high transition-colors">
+                        Manage
+                    </button>
+                </div>
+                <!-- Add-on Card: MySQL -->
+                <div class="bento-card rounded-xl p-md flex flex-col">
+                    <div class="flex justify-between items-start mb-sm">
+                        <div class="p-sm bg-surface-variant rounded-lg text-tertiary">
+                            <span class="material-symbols-outlined text-[24px]">database</span>
+                        </div>
+                        <span
+                            class="font-code-block text-code-block text-on-surface-variant bg-surface-container-highest px-xs py-[2px] rounded">v8.0.35</span>
+                    </div>
+                    <h3 class="font-headline-sm text-headline-sm text-on-surface mb-xs">MySQL</h3>
+                    <p class="font-body-md text-body-md text-on-surface-variant mb-md flex-1">Relational database
+                        management system.</p>
+                    <button
+                        class="w-full font-label-caps text-label-caps py-sm border border-outline-variant text-on-surface rounded-lg hover:bg-surface-container-high transition-colors">
+                        Manage
+                    </button>
+                </div>
+                <!-- Add-on Card: Redis -->
+                <div class="bento-card rounded-xl p-md flex flex-col">
+                    <div class="flex justify-between items-start mb-sm">
+                        <div class="p-sm bg-surface-variant rounded-lg text-error">
+                            <span class="material-symbols-outlined text-[24px]">memory</span>
+                        </div>
+                        <span
+                            class="font-code-block text-code-block text-on-surface-variant bg-surface-container-highest px-xs py-[2px] rounded">v7.2.4</span>
+                    </div>
+                    <h3 class="font-headline-sm text-headline-sm text-on-surface mb-xs">Redis</h3>
+                    <p class="font-body-md text-body-md text-on-surface-variant mb-md flex-1">In-memory data structure
+                        store, used as a database and cache.</p>
+                    <button
+                        class="w-full font-label-caps text-label-caps py-sm bg-primary text-on-primary border border-primary rounded-lg hover:bg-primary-container transition-colors">
+                        Install
+                    </button>
+                </div>
+                <!-- Add-on Card: Node.js -->
+                <div class="bento-card rounded-xl p-md flex flex-col">
+                    <div class="flex justify-between items-start mb-sm">
+                        <div class="p-sm bg-surface-variant rounded-lg text-primary">
+                            <span class="material-symbols-outlined text-[24px]">javascript</span>
+                        </div>
+                        <span
+                            class="font-code-block text-code-block text-on-surface-variant bg-surface-container-highest px-xs py-[2px] rounded">v20.11.0</span>
+                    </div>
+                    <h3 class="font-headline-sm text-headline-sm text-on-surface mb-xs">Node.js</h3>
+                    <p class="font-body-md text-body-md text-on-surface-variant mb-md flex-1">JavaScript runtime
+                        environment executing code outside a browser.</p>
+                    <button
+                        class="w-full font-label-caps text-label-caps py-sm border border-outline-variant text-on-surface rounded-lg hover:bg-surface-container-high transition-colors">
+                        Manage
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+
+</html>

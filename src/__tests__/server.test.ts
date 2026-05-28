@@ -80,4 +80,62 @@ describe("server api", () => {
 
 		await new Promise<void>((resolve) => server.close(() => resolve()));
 	});
+
+	it("exposes synchronous trigger execution for addon views", async () => {
+		const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "vps-manager-execute-"));
+		const builtinDir = path.join(tempRoot, "addons");
+		fs.mkdirSync(builtinDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(builtinDir, "sample.json"),
+			JSON.stringify(
+				{
+					name: "sample",
+					version: "1.0.0",
+					description: "sample addon",
+					triggers: {
+						status: { command: ["echo ok"] },
+					},
+				},
+				null,
+				2,
+			),
+			"utf8",
+		);
+
+		const app = createApp({
+			session: new SessionStore(),
+			events: new EventStreamHub(),
+			addonOptions: {
+				builtinDir,
+				cwdDir: path.join(tempRoot, "cwd-addons"),
+			},
+		});
+
+		const server = http.createServer(app);
+		await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+
+		const address = server.address();
+		if (!address || typeof address === "string") {
+			throw new Error("Expected TCP server address.");
+		}
+
+		const response = await fetch(`http://127.0.0.1:${address.port}/api/triggers/execute`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				addonName: "sample",
+				triggerName: "status",
+			}),
+		});
+
+		const json = await response.json();
+
+		expect(response.status).toBe(400);
+		expect(json.message).toMatch(/No active SSH session/);
+
+		await new Promise<void>((resolve) => server.close(() => resolve()));
+		fs.rmSync(tempRoot, { recursive: true, force: true });
+	});
 });
