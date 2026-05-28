@@ -116,9 +116,9 @@
 
                 async function refreshNodeVersions() {
                     setState("nodeVersionsList", await executeTrigger('listVersions').then(result => {
-                        return result.split("\n").filter(v => (/^v\d+\.\d+\.\d+/g).test(v.trim().replace(/(?!\.)\W/gi, ""))).map(v => v.match(/v\d+\.\d+\.\d+/g)[0] || "").filter(v => v.trim() !== "").map(v => v.replace(/^v/, "").trim());
+                        return result.split("\n").filter(v => (/^v\d+\.\d+\.\d+/g).test(v.trim().replace(/(?!\.)\W/gi, ""))).map(v => v.match(/v\d+\.\d+\.\d+/g)[0] || "").filter(v => v.trim() !== "").map(v => v.trim().replace(/^v/, ""));
                     }));
-                    setState("currentVersion", await executeTrigger('nodeVersion').then(result => result.trim()));
+                    setState("currentVersion", await executeTrigger('nodeVersion').then(result => result.trim().replace(/^v/, "")));
                 }
 
                 async function saveChange() {
