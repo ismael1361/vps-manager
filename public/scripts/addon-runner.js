@@ -1,9 +1,9 @@
 /* ================================================
    VPS Manager — Addon view sandbox runner
+   Adaptado para React: recebe appendLine como parâmetro
    ================================================ */
 import { api } from "./api.js";
-import { appendTerminalLine } from "./terminal.js";
-import { escHtml } from "./utils.js";
+import { escHtml, getAddonId } from "./utils.js";
 
 // ---- Cleanup reference ----
 var currentViewCleanup = null;
@@ -104,7 +104,8 @@ function interpolateTemplate(tmpl, evalInScope) {
 }
 
 // ---- Main runner ----
-export function runAddonView(viewDef, addonName, container) {
+export function runAddonView(viewDef, addonName, container, appendLine) {
+	if (typeof appendLine !== "function") appendLine = function () {};
 	cleanupCurrentView();
 
 	var ctxId = "_vctx" + Date.now();
@@ -121,22 +122,22 @@ export function runAddonView(viewDef, addonName, container) {
 
 	function executeTrigger(triggerName, inputs) {
 		inputs = inputs || {};
-		appendTerminalLine({ type: "info", text: "▶ " + addonName + ":" + triggerName });
+		appendLine({ type: "info", text: "▶ " + addonName + ":" + triggerName });
 		return api
 			.executeTrigger(addonName, triggerName, inputs)
 			.then(function (result) {
 				if (Array.isArray(result.commands)) {
 					result.commands.forEach(function (cmd) {
-						appendTerminalLine({ type: "command", text: "$ " + cmd });
+						appendLine({ type: "command", text: "$ " + cmd });
 					});
 				}
-				if (result.stdout) appendTerminalLine({ type: "stdout", text: result.stdout });
-				if (result.stderr) appendTerminalLine({ type: "stderr", text: result.stderr });
-				if (!result.stdout && !result.stderr) appendTerminalLine({ type: "success", text: "✓ done" });
+				if (result.stdout) appendLine({ type: "stdout", text: result.stdout });
+				if (result.stderr) appendLine({ type: "stderr", text: result.stderr });
+				if (!result.stdout && !result.stderr) appendLine({ type: "success", text: "✓ done" });
 				return result.stdout || result.stderr || "";
 			})
 			.catch(function (err) {
-				appendTerminalLine({ type: "error", text: "✗ " + err.message });
+				appendLine({ type: "error", text: "✗ " + err.message });
 				throw err;
 			});
 	}
@@ -194,7 +195,7 @@ export function runAddonView(viewDef, addonName, container) {
 			window[ctxId] = registry;
 			renderView();
 		}).catch(function (err) {
-			appendTerminalLine({ type: "error", text: "View runtime error: " + err.message });
+			appendLine({ type: "error", text: "View runtime error: " + err.message });
 		});
 	} catch (err) {
 		container.innerHTML = '<div class="p-md text-error font-code-block text-code-block">View error: ' + escHtml(err.message) + "</div>";
@@ -204,4 +205,120 @@ export function runAddonView(viewDef, addonName, container) {
 		delete window[ctxId];
 		container.innerHTML = "";
 	};
+}
+
+// ---- Lifecycle script runner ----
+
+/**
+ * Executes a named lifecycle function (install / initialize / uninstall / custom)
+ * defined in an addon's root <script> block.
+ *
+ * The script receives:
+ *   - executeTrigger(triggerName, inputs?) → Promise<string>
+ *   - $super  → high-level operations (readConfig, updateConfig, notify, uninstall, requireAddon)
+ *
+ * @param {object}   addonEntry  - The addon entry object from the store (with .addon and .id)
+ * @param {string}   fnName      - Name of the function to invoke ("install", "initialize", …)
+ * @param {Function} appendLine  - appendLine({ type, text }) for terminal output
+ * @param {Function} dispatch    - React dispatch for state changes
+ * @returns {Promise<{ success: boolean, error?: string }>}
+ */
+export function runAddonLifecycle(addonEntry, fnName, appendLine, dispatch) {
+	if (typeof appendLine !== "function") appendLine = function () {};
+	if (typeof dispatch !== "function") dispatch = function () {};
+
+	var addon = addonEntry.addon || addonEntry;
+	var addonId = addonEntry.id || getAddonId(addonEntry);
+	var scriptContent = addon.script;
+
+	// If no lifecycle script defined, treat as immediate success
+	if (!scriptContent || !scriptContent.trim()) {
+		return Promise.resolve({ success: true });
+	}
+
+	function executeTrigger(triggerName, inputs) {
+		inputs = inputs || {};
+		appendLine({ type: "info", text: "▶ " + addon.name + ":" + triggerName });
+		return api
+			.executeTrigger(addon.name, triggerName, inputs)
+			.then(function (result) {
+				if (Array.isArray(result.commands)) {
+					result.commands.forEach(function (cmd) {
+						appendLine({ type: "command", text: "$ " + cmd });
+					});
+				}
+				if (result.stdout) appendLine({ type: "stdout", text: result.stdout });
+				if (result.stderr) appendLine({ type: "stderr", text: result.stderr });
+				if (!result.stdout && !result.stderr) appendLine({ type: "success", text: "✓ done" });
+				return result.stdout || result.stderr || "";
+			})
+			.catch(function (err) {
+				appendLine({ type: "error", text: "✗ " + err.message });
+				throw err;
+			});
+	}
+
+	// $super — high-level API available inside the lifecycle script
+	var $super = {
+		readConfig: function () {
+			return api.getAddonConfig(addonId);
+		},
+		updateConfig: function (changes) {
+			return api.patchAddonConfig(addonId, { scope: changes }).then(function (entry) {
+				dispatch({ type: "PATCH_ADDON_CONFIG", payload: { id: addonId, entry: entry } });
+				return entry;
+			});
+		},
+		notify: function (message, type) {
+			appendLine({ type: type || "info", text: String(message) });
+			return Promise.resolve();
+		},
+		uninstall: function () {
+			return api.removeAddonConfig(addonId).then(function () {
+				dispatch({ type: "PATCH_ADDON_CONFIG", payload: { id: addonId, entry: null } });
+				dispatch({ type: "NAVIGATE", payload: { page: "dashboard", addon: null, view: null } });
+			});
+		},
+		requireAddon: function (depId) {
+			return api.getAddonConfig(depId).then(function (cfg) {
+				if (!cfg || cfg.state !== "installed") {
+					throw new Error("Required addon '" + depId + "' is not installed.");
+				}
+				return cfg;
+			});
+		},
+	};
+
+	var transformed = scriptContent.replace(/\blet\b/g, "var").replace(/\bconst\b/g, "var");
+	var funcNames = extractFunctionNames(scriptContent);
+
+	// Build: define all user functions, then expose the requested one
+	var scriptBody = transformed + "\n" + "return (typeof " + fnName + " !== 'undefined' ? " + fnName + " : null);";
+
+	return new Promise(function (resolve) {
+		try {
+			// eslint-disable-next-line no-new-func
+			var AsyncFunction = async function () {}.constructor;
+			var factory = new AsyncFunction("executeTrigger", "$super", scriptBody);
+			factory(executeTrigger, $super)
+				.then(function (fn) {
+					if (typeof fn !== "function") {
+						// Function not defined → treat as success (optional lifecycle hook)
+						resolve({ success: true });
+						return;
+					}
+					return fn();
+				})
+				.then(function () {
+					resolve({ success: true });
+				})
+				.catch(function (err) {
+					appendLine({ type: "error", text: "✗ " + fnName + "() failed: " + (err && err.message ? err.message : String(err)) });
+					resolve({ success: false, error: err && err.message ? err.message : String(err) });
+				});
+		} catch (err) {
+			appendLine({ type: "error", text: "✗ Script parse error: " + (err && err.message ? err.message : String(err)) });
+			resolve({ success: false, error: err && err.message ? err.message : String(err) });
+		}
+	});
 }

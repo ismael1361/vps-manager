@@ -1,7 +1,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { loadAddons, parseAddonObject, parseAddonXml } from "../core/addon";
+import { loadAddons, parseAddonObject, parseAddonXml, AddonManifest } from "../core/addon";
 
 function writeJson(filePath: string, content: unknown) {
 	fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -134,5 +134,98 @@ describe("addon loader", () => {
 				"memory.xml",
 			),
 		).toThrow(/invalid validation regex/i);
+	});
+
+	it("loads addon from directory with manifest.json and index file", async () => {
+		tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "vps-manager-addons-"));
+		const builtinDir = path.join(tempRoot, "builtin");
+		const addonDir = path.join(builtinDir, "nginx-manager");
+
+		writeJson(path.join(addonDir, "manifest.json"), {
+			short_name: "nginx-manager",
+			name: "Nginx Manager",
+			version: "0.1.0",
+			description: "Manage Nginx server blocks on your VPS.",
+			screenshots: [],
+		});
+
+		writeXml(
+			path.join(addonDir, "index"),
+			[
+				"<triggers>",
+				'  <trigger event="status">',
+				"    <actions>",
+				"      <command>sudo systemctl status nginx --no-pager</command>",
+				"    </actions>",
+				"  </trigger>",
+				'  <trigger event="restart">',
+				"    <actions>",
+				"      <command>sudo systemctl restart nginx</command>",
+				"    </actions>",
+				"  </trigger>",
+				"</triggers>",
+			].join("\n"),
+		);
+
+		const addons = await loadAddons({ builtinDir, cwdDir: path.join(tempRoot, "cwd") });
+
+		expect(addons).toHaveLength(1);
+		expect(addons[0].addon.short_name).toBe("nginx-manager");
+		expect(addons[0].addon.name).toBe("Nginx Manager");
+		expect(addons[0].addon.version).toBe("0.1.0");
+		expect(addons[0].addon.description).toBe("Manage Nginx server blocks on your VPS.");
+		expect(addons[0].addon.triggers.map((t) => t.name)).toEqual(["status", "restart"]);
+		expect(addons[0].sourceType).toBe("builtin");
+	});
+
+	it("directory addon overrides flat-file addon with the same name", async () => {
+		tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "vps-manager-addons-"));
+		const builtinDir = path.join(tempRoot, "builtin");
+
+		// Flat-file addon
+		writeJson(path.join(builtinDir, "nginx.json"), {
+			name: "Nginx Manager",
+			version: "1.0.0",
+			description: "flat file",
+			triggers: [{ name: "status", command: ["echo flat"] }],
+		});
+
+		// Directory addon with the same display name wins
+		const addonDir = path.join(builtinDir, "nginx-manager");
+		writeJson(path.join(addonDir, "manifest.json"), {
+			short_name: "nginx-manager",
+			name: "Nginx Manager",
+			version: "2.0.0",
+			description: "directory addon",
+		});
+		writeXml(
+			path.join(addonDir, "index"),
+			["<triggers>", '  <trigger event="status">', "    <actions>", "      <command>echo directory</command>", "    </actions>", "  </trigger>", "</triggers>"].join("\n"),
+		);
+
+		const addons = await loadAddons({ builtinDir, cwdDir: path.join(tempRoot, "cwd") });
+
+		expect(addons).toHaveLength(1);
+		expect(addons[0].addon.version).toBe("2.0.0");
+	});
+
+	it("parseAddonXml accepts metadata override suppressing inline name/version/description", () => {
+		const meta: Partial<AddonManifest> = {
+			short_name: "nginx-manager",
+			name: "Nginx Manager",
+			version: "0.1.0",
+			description: "Managed via manifest.json",
+		};
+
+		const manifest = parseAddonXml(
+			["<triggers>", '  <trigger event="status">', "    <actions>", "      <command>echo ok</command>", "    </actions>", "  </trigger>", "</triggers>"].join("\n"),
+			"memory.xml",
+			meta,
+		);
+
+		expect(manifest.name).toBe("Nginx Manager");
+		expect(manifest.short_name).toBe("nginx-manager");
+		expect(manifest.version).toBe("0.1.0");
+		expect(manifest.triggers[0].name).toBe("status");
 	});
 });

@@ -42,4 +42,21 @@ export var api = {
 	runTrigger: function (addonName, triggerName, inputs) {
 		return api.post("/api/triggers/run", { addonName: addonName, triggerName: triggerName, inputs: inputs || {} });
 	},
+	// ---- Addon config (vps-manager-addons.cfg) ----
+	getAllAddonConfigs: function () {
+		return api.get("/api/addons/config");
+	},
+	getAddonConfig: function (addonId) {
+		return api.get("/api/addons/" + encodeURIComponent(addonId) + "/config");
+	},
+	/**
+	 * Partial-update an addon's config entry.
+	 * Accepted fields: state, scope (merged), error, metadata (full upsert when present).
+	 */
+	patchAddonConfig: function (addonId, patch) {
+		return api.request("PATCH", "/api/addons/" + encodeURIComponent(addonId) + "/config", patch);
+	},
+	removeAddonConfig: function (addonId) {
+		return api.request("DELETE", "/api/addons/" + encodeURIComponent(addonId) + "/config");
+	},
 };

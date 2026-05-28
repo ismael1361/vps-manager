@@ -5,6 +5,28 @@ export function escHtml(str) {
 	return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+/** Returns a stable, URL-safe ID for an addon entry (matching server getAddonId). */
+export function getAddonId(entry) {
+	var addon = entry && entry.addon ? entry.addon : entry;
+	if (!addon) return "";
+	if (addon.short_name) return addon.short_name;
+	return addon.name
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-|-$/g, "");
+}
+
+/** Returns the config state for an addon ("installed", "pending", "error", "uninstalled", or null). */
+export function getAddonState(addonConfigs, addonId) {
+	var entry = addonConfigs && addonConfigs[addonId];
+	return entry ? entry.state : null;
+}
+
+/** Returns the full config entry or null. */
+export function getAddonConfigEntry(addonConfigs, addonId) {
+	return (addonConfigs && addonConfigs[addonId]) || null;
+}
+
 export var ADDON_ICONS = {
 	nginx: { icon: "dns", color: "text-primary" },
 	apache: { icon: "web", color: "text-primary" },

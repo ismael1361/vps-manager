@@ -20,12 +20,37 @@ export interface AddonViewDefinition {
 	content: string[];
 }
 
+export interface AddonIconDefinition {
+	src: string;
+	type?: string;
+	sizes?: string;
+}
+
 export interface AddonManifest {
+	short_name?: string;
 	name: string;
 	version: string;
 	description: string;
+	icon?: AddonIconDefinition;
+	screenshots?: string[];
 	triggers: AddonTriggerDefinition[];
 	views?: AddonViewDefinition[];
+	/** Root-level lifecycle script (install / initialize / uninstall functions). */
+	script?: string;
+}
+
+/**
+ * Returns a stable, URL-safe identifier for an addon.
+ * Uses `short_name` when available, otherwise derives from `name`.
+ */
+export function getAddonId(addon: AddonManifest): string {
+	return (
+		addon.short_name ||
+		addon.name
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/^-|-$/g, "")
+	);
 }
 
 export interface LoadedAddon {
@@ -300,29 +325,40 @@ export function parseAddonObject(value: unknown, sourcePath: string): AddonManif
 		throw new Error(`Addon file must contain a JSON object at ${sourcePath}.`);
 	}
 
-	assertAllowedKeys(value, ["name", "version", "description", "triggers", "view", "views"], "addon root", sourcePath);
+	assertAllowedKeys(value, ["short_name", "name", "version", "description", "icon", "screenshots", "triggers", "view", "views", "script"], "addon root", sourcePath);
 
 	const name = ensureString(value.name, "Addon name", sourcePath);
 	const version = ensureString(value.version, "Addon version", sourcePath);
 	const description = ensureString(value.description, "Addon description", sourcePath);
+	const short_name = typeof value.short_name === "string" && value.short_name.trim() ? value.short_name.trim() : undefined;
+	const icon = isRecord(value.icon) ? (value.icon as unknown as AddonIconDefinition) : undefined;
+	const screenshots = Array.isArray(value.screenshots) ? (value.screenshots as unknown[]).filter((s): s is string => typeof s === "string") : undefined;
 	const triggers = parseTriggers(value.triggers, sourcePath);
 	const views = parseViews(value.views ?? value.view, sourcePath);
+	const script = typeof value.script === "string" && value.script.trim() ? value.script.trim() : undefined;
 
 	return {
+		short_name,
 		name,
 		version,
 		description,
+		icon,
+		screenshots,
 		triggers,
 		views,
+		script,
 	};
 }
 
-export function parseAddonXml(raw: string, sourcePath: string): AddonManifest {
+export function parseAddonXml(raw: string, sourcePath: string, meta?: Partial<AddonManifest>): AddonManifest {
 	const document = normalizeXmlDocument(raw, sourcePath);
 	const rootInner = getXmlContainerInner(document, "addon", sourcePath);
-	const name = ensureString(normalizeXmlText(getXmlContainerInner(rootInner, "name", sourcePath)).trim(), "Addon name", sourcePath);
-	const version = ensureString(normalizeXmlText(getXmlContainerInner(rootInner, "version", sourcePath)).trim(), "Addon version", sourcePath);
-	const description = ensureString(normalizeXmlText(getXmlContainerInner(rootInner, "description", sourcePath)).trim(), "Addon description", sourcePath);
+	const nameFromXml = getXmlContainerInner(rootInner, "name", sourcePath, false);
+	const name = ensureString(meta?.name ?? (nameFromXml ? normalizeXmlText(nameFromXml).trim() : undefined), "Addon name", sourcePath);
+	const versionFromXml = getXmlContainerInner(rootInner, "version", sourcePath, false);
+	const version = ensureString(meta?.version ?? (versionFromXml ? normalizeXmlText(versionFromXml).trim() : undefined), "Addon version", sourcePath);
+	const descriptionFromXml = getXmlContainerInner(rootInner, "description", sourcePath, false);
+	const description = ensureString(meta?.description ?? (descriptionFromXml ? normalizeXmlText(descriptionFromXml).trim() : undefined), "Addon description", sourcePath);
 	const triggerSource = getXmlContainerInner(rootInner, "triggers", sourcePath, false) ?? rootInner;
 	const triggerElements = Array.from(triggerSource.matchAll(/<trigger(\s[^>]*)?>([\s\S]*?)<\/trigger>/gi));
 
@@ -365,12 +401,21 @@ export function parseAddonXml(raw: string, sourcePath: string): AddonManifest {
 			})
 		: undefined;
 
+	// Extract root-level <script> block, ignoring scripts nested inside <view> elements.
+	const rootWithoutViews = rootInner.replace(/<views[\s\S]*?<\/views>/gi, "").replace(/<view[\s\S]*?<\/view>/gi, "");
+	const rootScriptMatch = rootWithoutViews.match(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/i);
+	const script = rootScriptMatch ? normalizeXmlText(rootScriptMatch[1]).trim() || undefined : undefined;
+
 	return {
+		short_name: meta?.short_name,
 		name,
 		version,
 		description,
+		icon: meta?.icon,
+		screenshots: meta?.screenshots,
 		triggers,
 		views,
+		script,
 	};
 }
 
@@ -410,13 +455,66 @@ function getAddonEntryPriority(entryName: string) {
 	return path.extname(entryName).toLowerCase() === ".json" ? 0 : 1;
 }
 
-function parseAddonFile(raw: string, sourcePath: string) {
+function parseAddonFile(raw: string, sourcePath: string, meta?: Partial<AddonManifest>) {
 	const format = detectAddonFormat(sourcePath, raw);
 	if (format === "json") {
 		return parseAddonObject(JSON.parse(raw), sourcePath);
 	}
 
-	return parseAddonXml(raw, sourcePath);
+	return parseAddonXml(raw, sourcePath, meta);
+}
+
+interface AddonDirectoryManifest {
+	short_name?: string;
+	name: string;
+	version: string;
+	description: string;
+	icon?: AddonIconDefinition;
+	screenshots?: string[];
+}
+
+const INDEX_CANDIDATE_NAMES = ["index", "index.xml", "index.json"];
+
+function parseAddonManifestJson(raw: string, sourcePath: string): AddonDirectoryManifest {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(raw);
+	} catch {
+		throw new Error(`Failed to parse manifest.json as JSON at ${sourcePath}.`);
+	}
+
+	if (!isRecord(parsed)) {
+		throw new Error(`manifest.json must contain a JSON object at ${sourcePath}.`);
+	}
+
+	assertAllowedKeys(parsed, ["short_name", "name", "version", "description", "icon", "screenshots"], "manifest.json", sourcePath);
+
+	return {
+		short_name: typeof parsed.short_name === "string" && parsed.short_name.trim() ? parsed.short_name.trim() : undefined,
+		name: ensureString(parsed.name, "manifest name", sourcePath),
+		version: ensureString(parsed.version, "manifest version", sourcePath),
+		description: ensureString(parsed.description, "manifest description", sourcePath),
+		icon: isRecord(parsed.icon) ? (parsed.icon as unknown as AddonIconDefinition) : undefined,
+		screenshots: Array.isArray(parsed.screenshots) ? (parsed.screenshots as unknown[]).filter((s): s is string => typeof s === "string") : undefined,
+	};
+}
+
+function loadAddonFromSubdirectory(directoryPath: string, sourceType: LoadedAddon["sourceType"]): LoadedAddon {
+	const manifestPath = path.join(directoryPath, "manifest.json");
+	const manifestRaw = fs.readFileSync(manifestPath, "utf8");
+	const directoryMeta = parseAddonManifestJson(manifestRaw, manifestPath);
+
+	const indexEntry = INDEX_CANDIDATE_NAMES.find((candidate) => fs.existsSync(path.join(directoryPath, candidate)));
+
+	if (!indexEntry) {
+		throw new Error(`Addon directory "${directoryPath}" has a manifest.json but no index file (expected one of: ${INDEX_CANDIDATE_NAMES.join(", ")}).`);
+	}
+
+	const indexPath = path.join(directoryPath, indexEntry);
+	const indexRaw = fs.readFileSync(indexPath, "utf8");
+	const addon = parseAddonFile(indexRaw, indexPath, directoryMeta);
+
+	return { addon, sourcePath: directoryPath, sourceType };
 }
 
 async function readAddonsFromDirectory(directoryPath: string, sourceType: LoadedAddon["sourceType"]) {
@@ -424,8 +522,15 @@ async function readAddonsFromDirectory(directoryPath: string, sourceType: Loaded
 		return [] as LoadedAddon[];
 	}
 
-	const entries = fs
-		.readdirSync(directoryPath, { withFileTypes: true })
+	const dirents = fs.readdirSync(directoryPath, { withFileTypes: true });
+
+	// Subdirectories with a manifest.json follow the new directory-based addon format
+	const dirResults: LoadedAddon[] = dirents
+		.filter((entry) => entry.isDirectory() && fs.existsSync(path.join(directoryPath, entry.name, "manifest.json")))
+		.map((entry) => loadAddonFromSubdirectory(path.join(directoryPath, entry.name), sourceType));
+
+	// Flat files follow the legacy single-file addon format
+	const entries = dirents
 		.filter((entry) => entry.isFile() && isSupportedAddonEntry(entry.name))
 		.map((entry) => entry.name)
 		.sort((left, right) => {
@@ -442,7 +547,7 @@ async function readAddonsFromDirectory(directoryPath: string, sourceType: Loaded
 			return left.localeCompare(right);
 		});
 
-	return entries.map((entry) => {
+	const fileResults = entries.map((entry) => {
 		const sourcePath = path.join(directoryPath, entry);
 		const raw = fs.readFileSync(sourcePath, "utf8");
 		const addon = parseAddonFile(raw, sourcePath);
@@ -453,6 +558,8 @@ async function readAddonsFromDirectory(directoryPath: string, sourceType: Loaded
 			sourceType,
 		};
 	});
+
+	return [...fileResults, ...dirResults];
 }
 
 export async function loadAddons(options: LoadAddonsOptions = {}) {

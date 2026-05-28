@@ -2,11 +2,13 @@ import express, { type Request, type Response } from "express";
 import http from "http";
 import { randomUUID } from "crypto";
 import fs from "fs";
+import os from "os";
 import path from "path";
 import net from "net";
 import type { ClientChannel } from "ssh2";
 import { EventStreamHub } from "./core/events";
-import { getAddonByName, getTriggerByName, loadAddons, type LoadAddonsOptions } from "./core/addon";
+import { getAddonByName, getTriggerByName, loadAddons, getAddonId, type LoadAddonsOptions } from "./core/addon";
+import { AddonConfigStore, type AddonState } from "./core/addon-config";
 import { prepareTriggerExecution, executePreparedCommands, executePreparedCommandsWithOutput } from "./core/executor";
 import { getPublicDir } from "./core/paths";
 import { SessionStore, type ConnectSessionInput, type RemoteExecClient } from "./core/session";
@@ -16,6 +18,7 @@ export interface StartServerOptions {
 	preferredPort?: number;
 	autoOpen?: boolean;
 	addonOptions?: LoadAddonsOptions;
+	configFilePath?: string;
 }
 
 export interface StartedServer {
@@ -31,6 +34,7 @@ export interface AppServices {
 	session: SessionStore;
 	events: EventStreamHub;
 	addonOptions?: LoadAddonsOptions;
+	configStore?: AddonConfigStore;
 }
 
 interface RemoteCommandResult {
@@ -233,6 +237,7 @@ async function readVpsStatus(services: AppServices) {
 }
 
 export function createApp(services: AppServices) {
+	const configStore: AddonConfigStore = services.configStore ?? new AddonConfigStore(path.join(os.tmpdir(), `vps-manager-addons-${process.pid}.cfg`));
 	const app = express();
 	const publicDir = getPublicDir();
 
@@ -281,7 +286,98 @@ export function createApp(services: AppServices) {
 	app.get("/api/addons", async (_req: Request, res: Response) => {
 		try {
 			const addons = await loadAddons(services.addonOptions);
-			res.json(addons);
+			const config = configStore.read();
+			const result = addons.map((entry) => ({
+				...entry,
+				id: getAddonId(entry.addon),
+				configEntry: config.addons[getAddonId(entry.addon)] ?? null,
+			}));
+			res.json(result);
+		} catch (error) {
+			sendError(res, error);
+		}
+	});
+
+	// ---- Addon config routes (must be declared before /:name routes) ----
+
+	app.get("/api/addons/config", (_req: Request, res: Response) => {
+		try {
+			res.json(configStore.read());
+		} catch (error) {
+			sendError(res, error);
+		}
+	});
+
+	app.get("/api/addons/:id/config", (req: Request, res: Response) => {
+		try {
+			const addonId = req.params["id"] as string;
+			const entry = configStore.getEntry(addonId);
+			if (!entry) {
+				res.status(404).json({ message: `No config entry for addon "${addonId}".` });
+				return;
+			}
+			res.json(entry);
+		} catch (error) {
+			sendError(res, error);
+		}
+	});
+
+	app.patch("/api/addons/:id/config", async (req: Request, res: Response) => {
+		try {
+			const {
+				state,
+				scope,
+				error: errorMsg,
+				metadata,
+			} = req.body as {
+				state?: AddonState;
+				scope?: Record<string, unknown>;
+				error?: string;
+				metadata?: { name: string; version: string };
+			};
+
+			const addonId = req.params["id"] as string;
+
+			if (metadata) {
+				// Full upsert with metadata (used during install initiation)
+				const entry = await configStore.upsert(addonId, {
+					metadata,
+					state: state ?? "pending",
+					scope: scope ?? {},
+				});
+				services.events.emit("addon:config", { addonId, entry });
+				res.json(entry);
+				return;
+			}
+
+			// Partial patch: state and/or scope
+			let entry = configStore.getEntry(addonId);
+			if (!entry) {
+				res.status(404).json({ message: `No config entry for addon "${addonId}".` });
+				return;
+			}
+
+			if (state !== undefined) {
+				entry = (await configStore.setState(addonId, state, errorMsg)) ?? entry;
+			}
+
+			if (scope !== undefined) {
+				entry = (await configStore.updateScope(addonId, scope)) ?? entry;
+			}
+
+			services.events.emit("addon:config", { addonId, entry });
+			res.json(entry);
+		} catch (error) {
+			sendError(res, error);
+		}
+	});
+
+	app.delete("/api/addons/:id/config", async (req: Request, res: Response) => {
+		try {
+			const addonId = req.params["id"] as string;
+			await configStore.remove(addonId);
+			services.events.emit("addon:config", { addonId, entry: null });
+			res.json({ removed: true });
 		} catch (error) {
 			sendError(res, error);
 		}
@@ -446,10 +542,12 @@ export async function startServer(options: StartServerOptions = {}): Promise<Sta
 	const host = options.host || "127.0.0.1";
 	const requestedPort = options.preferredPort || DEFAULT_PORT;
 	const port = (await findAvailablePort(requestedPort, MAX_PORT, host)) ?? requestedPort;
+	const configFilePath = options.configFilePath ?? path.resolve(process.cwd(), "vps-manager-addons.cfg");
 	const services: AppServices = {
 		session: new SessionStore(),
 		events: new EventStreamHub(),
 		addonOptions: options.addonOptions,
+		configStore: new AddonConfigStore(configFilePath),
 	};
 	const app = createApp(services);
 	const server = http.createServer(app);

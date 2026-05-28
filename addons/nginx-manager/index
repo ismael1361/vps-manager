@@ -1,7 +1,32 @@
 <addon>
-    <name>nginx</name>
-    <version>1.0.0</version>
-    <description>Manage Nginx server blocks (virtual hosts) on your VPS.</description>
+    <script>
+        async function install() {
+            var isInstalled = await executeTrigger("installed").then(function(result) { return result.trim() !== ""; });
+            if (!isInstalled) {
+                await executeTrigger("install");
+                await executeTrigger("ufw_allow");
+            }
+            await $super.updateConfig({ nginxInstalled: true, installedAt: new Date().toISOString() });
+            await $super.notify("Nginx Manager installed successfully.", "success");
+        }
+
+        async function initialize() {
+            var isInstalled = await executeTrigger("installed").then(function(result) { return result.trim() !== ""; });
+            if (!isInstalled) {
+                await $super.notify("Nginx not found on VPS — removing addon configuration.", "error");
+                await $super.uninstall();
+            }
+        }
+
+        async function uninstall() {
+            var isInstalled = await executeTrigger("installed").then(function(result) { return result.trim() !== ""; });
+            if (isInstalled) {
+                await executeTrigger("uninstall");
+            }
+            await $super.notify("Nginx Manager uninstalled.", "info");
+            await $super.uninstall();
+        }
+    </script>
     <triggers>
         <trigger event="install">
             <actions>
@@ -9,6 +34,11 @@
                 <command>sudo apt install -y nginx</command>
                 <command>sudo systemctl start nginx</command>
                 <command>sudo systemctl enable nginx</command>
+            </actions>
+        </trigger>
+        <trigger event="installed">
+            <actions>
+                <command>which nginx</command>
             </actions>
         </trigger>
         <trigger event="ufw_allow">
