@@ -1,21 +1,20 @@
 <!DOCTYPE html>
-
 <html class="dark" lang="en">
 
 <head>
-    <meta charset="utf-8" />
-    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
     <title>VPS Manager - Add-ons Dashboard</title>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
-        rel="stylesheet" />
+        rel="stylesheet">
     <link
         href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap"
-        rel="stylesheet" />
+        rel="stylesheet">
     <link
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
-        rel="stylesheet" />
+        rel="stylesheet">
     <script id="tailwind-config">
         tailwind.config = {
             darkMode: "class",
@@ -180,8 +179,8 @@
     </script>
     <style>
         body {
-            background-color: #020617;
-            /* Deepest layer */
+            background-color: #0e1511;
+            /* surface-dim */
             color: #dde4dd;
         }
 
@@ -192,15 +191,72 @@
         }
 
         .bento-card {
-            background-color: #1e293b;
-            /* Surface */
-            border: 1px solid #334155;
+            background-color: #1a211d;
+            /* surface-container */
+            border: 1px solid #3c4a42;
+            /* outline-variant */
             transition: all 0.2s ease-in-out;
         }
 
         .bento-card:hover {
             background-color: #242c27;
+            /* surface-container-high */
             border-color: #4edea3;
+            /* primary */
+            box-shadow: inset 0 0 10px rgba(78, 222, 163, 0.05);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #4edea3;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(78, 222, 163, 0.7);
+            }
+
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 6px rgba(78, 222, 163, 0);
+            }
+
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(78, 222, 163, 0);
+            }
+        }
+    </style>
+    <style>
+        body {
+            background-color: #0e1511;
+            /* surface-dim */
+            color: #dde4dd;
+        }
+
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .bento-card {
+            background-color: #1a211d;
+            /* surface-container */
+            border: 1px solid #3c4a42;
+            /* outline-variant */
+            transition: all 0.2s ease-in-out;
+        }
+
+        .bento-card:hover {
+            background-color: #242c27;
+            /* surface-container-high */
+            border-color: #4edea3;
+            /* primary */
             box-shadow: inset 0 0 10px rgba(78, 222, 163, 0.05);
         }
 
@@ -231,7 +287,7 @@
     </style>
 </head>
 
-<body class="flex min-h-screen">
+<body class="flex min-h-screen bg-surface-dim">
     <!-- SideNavBar -->
     <nav
         class="bg-surface-container-low dark:bg-surface-container-low text-primary dark:text-primary border-r border-outline-variant flat no shadows flex flex-col h-full py-lg px-md w-64 fixed left-0 top-0 z-40 hidden md:flex">
@@ -280,7 +336,7 @@
         </div>
     </nav>
     <!-- Main Content Area -->
-    <div class="flex-1 flex flex-col md:ml-64 w-full">
+    <div class="flex-1 flex flex-col md:ml-64 w-full bg-surface-dim">
         <!-- TopAppBar -->
         <header
             class="bg-surface-container dark:bg-surface-container text-primary dark:text-primary docked full-width top-0 border-b border-outline-variant flat no shadows flex justify-between items-center w-full px-md h-14 sticky z-30">
@@ -401,6 +457,8 @@
             </div>
         </main>
     </div>
+
+
 </body>
 
 </html>

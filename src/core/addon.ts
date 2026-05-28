@@ -144,8 +144,14 @@ function parseXmlViewContent(source: string, scope: string, sourcePath: string) 
 
 	for (const match of source.matchAll(expression)) {
 		const tagName = match[1].toLowerCase();
+		const rawAttrs = (match[2] || "").trim();
 		const attributes = parseXmlAttributes(match[2], `${scope} <${tagName}>`, sourcePath);
-		if (Object.keys(attributes).length > 0) {
+
+		// <template if="..."> is the only supported attribute-bearing tag
+		const allowedAttrs: Record<string, string[]> = { template: ["if"] };
+		const allowed = allowedAttrs[tagName] ?? [];
+		const unsupported = Object.keys(attributes).filter((k) => !allowed.includes(k));
+		if (unsupported.length > 0) {
 			throw new Error(`Unsupported attributes in ${scope} <${tagName}> at ${sourcePath}.`);
 		}
 
@@ -153,7 +159,9 @@ function parseXmlViewContent(source: string, scope: string, sourcePath: string) 
 			content.push("");
 		}
 
-		content.push(`<${tagName}>`);
+		// Preserve recognised attributes (e.g. if) in the opening tag
+		const openTag = rawAttrs ? `<${tagName} ${rawAttrs}>` : `<${tagName}>`;
+		content.push(openTag);
 
 		const body = normalizeXmlText(match[3]).replace(/^\n+/, "").replace(/\n+$/, "");
 		if (body) {

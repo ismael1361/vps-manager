@@ -144,7 +144,7 @@
 <body class="bg-background text-on-background antialiased h-screen overflow-hidden flex">
     <!-- SideNavBar -->
     <nav
-        class="bg-surface-container-low dark:bg-surface-container-low flex flex-col h-full py-lg px-md w-64 fixed left-0 top-0 z-40 bg-surface-container-low border-r border-outline-variant hidden md:flex">
+        class="bg-surface-container-low dark:bg-surface-container-low flex flex-col h-full py-lg px-md w-64 fixed left-0 top-0 z-40 border-r border-outline-variant hidden md:flex">
         <div class="mb-xl flex items-center gap-sm">
             <div class="w-8 h-8 rounded bg-primary flex items-center justify-center text-on-primary-fixed font-bold">
                 <span class="material-symbols-outlined text-[18px]">terminal</span>
@@ -231,241 +231,218 @@
                 </button>
             </div>
         </header>
-        <!-- Page Canvas -->
-        <main class="flex-1 overflow-y-auto p-margin-desktop bg-background">
-            <!-- Breadcrumb & Header -->
-            <div class="mb-lg flex flex-col gap-xs">
-                <div class="flex items-center gap-sm text-on-surface-variant font-label-caps text-label-caps">
-                    <span>Add-ons</span>
-                    <span class="material-symbols-outlined text-[14px]">chevron_right</span>
-                    <span class="text-primary">Nginx</span>
-                </div>
-                <div class="flex items-center justify-between">
-                    <h2 class="font-headline-lg text-headline-lg text-on-surface flex items-center gap-md">
-                        Nginx Web Server
-                        <span
-                            class="px-sm py-xs bg-surface-variant border border-outline-variant rounded font-label-caps text-label-caps text-primary flex items-center gap-xs">
-                            <span class="material-symbols-outlined text-[14px]">check_circle</span>
-                            Installed
-                        </span>
-                    </h2>
-                </div>
-            </div>
-            <!-- Content Grid -->
-            <div class="grid grid-cols-12 gap-gutter h-[calc(100vh-180px)]">
-                <!-- Left Panel: Triggers & Forms -->
-                <div class="col-span-12 lg:col-span-4 flex flex-col gap-md h-full overflow-y-auto pr-sm">
-                    <div class="bg-surface-container rounded-lg border border-outline-variant p-md">
-                        <h3
-                            class="font-headline-sm text-headline-sm mb-md text-on-surface border-b border-outline-variant pb-xs">
-                            Available Actions</h3>
-                        <div class="flex flex-col gap-sm">
-                            <button
-                                class="flex items-center justify-between p-sm bg-surface-variant hover:bg-surface-bright rounded border border-outline-variant transition-colors text-left group">
-                                <div class="flex items-center gap-sm">
-                                    <span
-                                        class="material-symbols-outlined text-primary group-hover:fill">download</span>
-                                    <span class="font-body-md text-body-md text-on-surface">Reinstall / Update</span>
-                                </div>
-                                <span
-                                    class="material-symbols-outlined text-on-surface-variant text-[18px]">play_arrow</span>
-                            </button>
-                            <button
-                                class="flex items-center justify-between p-sm bg-surface-variant hover:bg-surface-bright rounded border border-outline-variant transition-colors text-left group">
-                                <div class="flex items-center gap-sm">
-                                    <span
-                                        class="material-symbols-outlined text-secondary group-hover:fill">security</span>
-                                    <span class="font-body-md text-body-md text-on-surface">Allow HTTP/HTTPS
-                                        (UFW)</span>
-                                </div>
-                                <span
-                                    class="material-symbols-outlined text-on-surface-variant text-[18px]">play_arrow</span>
-                            </button>
-                            <!-- Active Trigger with Form -->
-                            <div
-                                class="bg-surface-bright rounded border border-primary p-sm flex flex-col gap-md relative overflow-hidden">
-                                <div class="absolute left-0 top-0 bottom-0 w-[2px] bg-primary"></div>
-                                <div class="flex items-center justify-between pl-sm">
-                                    <div class="flex items-center gap-sm">
-                                        <span class="material-symbols-outlined text-primary fill">public</span>
-                                        <span class="font-body-md text-body-md text-on-surface font-bold">Create Site
-                                            (Virtual Host)</span>
-                                    </div>
-                                    <span
-                                        class="material-symbols-outlined text-primary text-[18px]">keyboard_arrow_down</span>
-                                </div>
-                                <div class="flex flex-col gap-md pl-sm border-t border-outline-variant pt-md mt-xs">
-                                    <div class="flex flex-col gap-xs">
-                                        <label class="font-label-caps text-label-caps text-on-surface-variant">Domain
-                                            Name</label>
-                                        <input
-                                            class="bg-surface-container-highest border border-outline-variant rounded p-sm font-code-block text-code-block text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                                            type="text" value="example.com" />
-                                    </div>
-                                    <div class="flex flex-col gap-xs">
-                                        <label class="font-label-caps text-label-caps text-on-surface-variant">Web Root
-                                            Path</label>
-                                        <input
-                                            class="bg-surface-container-highest border border-outline-variant rounded p-sm font-code-block text-code-block text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                                            type="text" value="/var/www/example.com" />
-                                    </div>
-                                    <div class="flex items-center gap-sm mt-sm">
-                                        <button
-                                            class="flex-1 bg-primary text-on-primary-fixed hover:bg-primary-fixed transition-colors py-sm px-md rounded font-label-caps text-label-caps flex items-center justify-center gap-sm">
-                                            <span class="material-symbols-outlined text-[16px]">bolt</span>
-                                            Execute
-                                        </button>
-                                        <button
-                                            class="p-sm border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-variant rounded transition-colors flex items-center justify-center">
-                                            <span class="material-symbols-outlined text-[18px]">code</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <button
-                                class="flex items-center justify-between p-sm bg-surface-variant hover:bg-surface-bright rounded border border-outline-variant transition-colors text-left group">
-                                <div class="flex items-center gap-sm">
-                                    <span
-                                        class="material-symbols-outlined text-tertiary group-hover:fill">restart_alt</span>
-                                    <span class="font-body-md text-body-md text-on-surface">Restart Service</span>
-                                </div>
-                                <span
-                                    class="material-symbols-outlined text-on-surface-variant text-[18px]">play_arrow</span>
-                            </button>
+        <div class="flex-1 flex flex-col overflow-hidden relative">
+            <!-- Page Canvas -->
+            <main class="flex-1 overflow-y-auto p-margin-desktop bg-background pb-8">
+                <!-- Breadcrumb & Header -->
+                <div class="mb-lg flex flex-col gap-xs">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-sm text-on-surface-variant font-label-caps text-label-caps">
+                            <span>Add-ons</span>
+                            <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+                            <span class="text-primary">Nginx</span>
                         </div>
+                        <button
+                            class="flex items-center gap-xs px-sm py-xs bg-surface-variant hover:bg-surface-bright rounded border border-outline-variant text-on-surface-variant font-label-caps text-label-caps transition-colors">
+                            <span class="material-symbols-outlined text-[16px]">code</span> View XML Source
+                        </button>
                     </div>
-                </div>
-                <!-- Right Panel: Terminal Output -->
-                <div
-                    class="col-span-12 lg:col-span-8 flex flex-col h-full rounded-lg border border-outline-variant bg-surface-container-lowest overflow-hidden shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]">
-                    <!-- Terminal Header -->
-                    <div
-                        class="bg-surface-container border-b border-outline-variant flex justify-between items-center px-md py-sm shrink-0">
-                        <div class="flex items-center gap-sm">
-                            <span class="material-symbols-outlined text-on-surface-variant text-[18px]">terminal</span>
+                    <div class="flex items-center justify-between mt-sm">
+                        <h2 class="font-headline-lg text-headline-lg text-on-surface flex items-center gap-md">
+                            Nginx Web Server
                             <span
-                                class="font-label-caps text-label-caps text-on-surface-variant">root@vps-prod-01:~#</span>
-                        </div>
-                        <div class="flex items-center gap-sm">
-                            <button
-                                class="text-on-surface-variant hover:text-primary transition-colors flex items-center gap-xs font-label-caps text-label-caps">
-                                <span class="material-symbols-outlined text-[16px]">content_copy</span> Copy
-                            </button>
-                            <div class="w-[1px] h-4 bg-outline-variant mx-xs"></div>
-                            <button
-                                class="text-on-surface-variant hover:text-error transition-colors flex items-center gap-xs font-label-caps text-label-caps">
-                                <span class="material-symbols-outlined text-[16px]">clear_all</span> Clear
-                            </button>
-                        </div>
+                                class="px-sm py-xs bg-surface-variant border border-outline-variant rounded font-label-caps text-label-caps text-primary flex items-center gap-xs">
+                                <span class="material-symbols-outlined text-[14px]">check_circle</span>
+                                Installed
+                            </span>
+                        </h2>
                     </div>
-                    <!-- Terminal Canvas -->
-                    <div
-                        class="flex-1 p-md overflow-y-auto font-code-block text-code-block text-on-surface variant selection:bg-primary selection:text-on-primary-fixed">
-                        <div class="flex flex-col gap-1 opacity-70">
-                            <div class="flex gap-sm text-outline">
-                                <span class="w-6 text-right select-none">1</span>
-                                <span>$ ufw allow 'Nginx Full'</span>
+                    <!-- Tabs Navigation -->
+                    <div class="flex items-center gap-md mt-md border-b border-outline-variant">
+                        <button
+                            class="px-md py-sm font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface transition-colors">Dashboard</button>
+                        <button
+                            class="px-md py-sm font-label-caps text-label-caps text-primary border-b-2 border-primary transition-colors">Create
+                            Site</button>
+                    </div>
+                </div>
+                <!-- Content -->
+                <div class="max-w-4xl mt-lg">
+                    <!-- Form Panel -->
+                    <div class="flex flex-col gap-md">
+                        <div class="bg-surface-container rounded-lg border border-outline-variant p-md">
+                            <h3
+                                class="font-headline-sm text-headline-sm mb-md text-on-surface border-b border-outline-variant pb-xs">
+                                New Site Configuration</h3>
+                            <div class="flex flex-col gap-md">
+                                <div class="flex flex-col gap-xs">
+                                    <label
+                                        class="font-label-caps text-label-caps text-on-surface-variant">Domain</label>
+                                    <input
+                                        class="w-full bg-surface-container-highest border border-outline-variant rounded p-sm font-code-block text-code-block text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                                        type="text" value="example.com" />
+                                </div>
+                                <div class="flex flex-col gap-xs">
+                                    <label
+                                        class="font-label-caps text-label-caps text-on-surface-variant">Configuration</label>
+                                    <textarea
+                                        class="w-full h-48 bg-surface-container-highest border border-outline-variant rounded p-sm font-code-block text-code-block text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all resize-none">server {
+    listen 80;
+    server_name example.com www.example.com;
+    root /var/www/example.com/html;
+    index index.html index.htm;
+    
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}</textarea>
+                                </div>
+                                <div class="flex flex-col gap-sm mt-sm">
+                                    <button
+                                        class="w-full lg:w-auto self-start bg-primary text-on-primary-fixed hover:bg-primary-fixed transition-colors py-sm px-xl rounded font-label-caps text-label-caps flex items-center justify-center gap-sm">
+                                        <span class="material-symbols-outlined text-[16px]">bolt</span>
+                                        Execute Trigger
+                                    </button>
+                                </div>
                             </div>
-                            <div class="flex gap-sm">
-                                <span class="w-6 text-right select-none text-outline">2</span>
-                                <span>Rule added</span>
-                            </div>
-                            <div class="flex gap-sm">
-                                <span class="w-6 text-right select-none text-outline">3</span>
-                                <span>Rule added (v6)</span>
-                            </div>
-                            <div class="flex gap-sm text-outline mt-sm">
-                                <span class="w-6 text-right select-none">4</span>
-                                <span>$ mkdir -p /var/www/example.com/html</span>
-                            </div>
-                            <div class="flex gap-sm text-outline">
-                                <span class="w-6 text-right select-none">5</span>
-                                <span>$ chown -R $USER:$USER /var/www/example.com/html</span>
-                            </div>
-                            <div class="flex gap-sm text-outline">
-                                <span class="w-6 text-right select-none">6</span>
-                                <span>$ chmod -R 755 /var/www/example.com</span>
-                            </div>
-                            <div class="flex gap-sm text-outline mt-sm">
-                                <span class="w-6 text-right select-none">7</span>
-                                <span>$ cat &lt;&lt;EOF &gt; /etc/nginx/sites-available/example.com</span>
-                            </div>
-                            <div class="flex gap-sm text-secondary">
-                                <span class="w-6 text-right select-none text-outline">8</span>
-                                <span>server {</span>
-                            </div>
-                            <div class="flex gap-sm text-secondary pl-4">
-                                <span class="w-6 text-right select-none text-outline ml-[-1rem]">9</span>
-                                <span>listen 80;</span>
-                            </div>
-                            <div class="flex gap-sm text-secondary pl-4">
-                                <span class="w-6 text-right select-none text-outline ml-[-1rem]">10</span>
-                                <span>listen [::]:80;</span>
-                            </div>
-                            <div class="flex gap-sm text-secondary pl-4 mt-1">
-                                <span class="w-6 text-right select-none text-outline ml-[-1rem]">11</span>
-                                <span>root /var/www/example.com/html;</span>
-                            </div>
-                            <div class="flex gap-sm text-secondary pl-4">
-                                <span class="w-6 text-right select-none text-outline ml-[-1rem]">12</span>
-                                <span>index index.html index.htm index.nginx-debian.html;</span>
-                            </div>
-                            <div class="flex gap-sm text-secondary pl-4 mt-1">
-                                <span class="w-6 text-right select-none text-outline ml-[-1rem]">13</span>
-                                <span>server_name example.com www.example.com;</span>
-                            </div>
-                            <div class="flex gap-sm text-secondary pl-4 mt-1">
-                                <span class="w-6 text-right select-none text-outline ml-[-1rem]">14</span>
-                                <span>location / {</span>
-                            </div>
-                            <div class="flex gap-sm text-secondary pl-8">
-                                <span class="w-6 text-right select-none text-outline ml-[-2rem]">15</span>
-                                <span>try_files $uri $uri/ =404;</span>
-                            </div>
-                            <div class="flex gap-sm text-secondary pl-4">
-                                <span class="w-6 text-right select-none text-outline ml-[-1rem]">16</span>
-                                <span>}</span>
-                            </div>
-                            <div class="flex gap-sm text-secondary">
-                                <span class="w-6 text-right select-none text-outline">17</span>
-                                <span>}</span>
-                            </div>
-                            <div class="flex gap-sm text-outline">
-                                <span class="w-6 text-right select-none">18</span>
-                                <span>EOF</span>
-                            </div>
-                            <div class="flex gap-sm text-outline mt-sm">
-                                <span class="w-6 text-right select-none">19</span>
-                                <span>$ ln -s /etc/nginx/sites-available/example.com /etc/nginx/sites-enabled/</span>
-                            </div>
-                            <div class="flex gap-sm text-outline">
-                                <span class="w-6 text-right select-none">20</span>
-                                <span>$ nginx -t</span>
-                            </div>
-                        </div>
-                        <!-- Active typing line -->
-                        <div class="flex gap-sm mt-sm items-center">
-                            <span class="w-6 text-right select-none text-outline opacity-50">21</span>
-                            <span class="text-primary">nginx: the configuration file /etc/nginx/nginx.conf syntax is
-                                ok</span>
-                        </div>
-                        <div class="flex gap-sm items-center">
-                            <span class="w-6 text-right select-none text-outline opacity-50">22</span>
-                            <span class="text-primary">nginx: configuration file /etc/nginx/nginx.conf test is
-                                successful</span>
-                        </div>
-                        <div class="flex gap-sm mt-sm text-outline">
-                            <span class="w-6 text-right select-none">23</span>
-                            <span>$ systemctl restart nginx</span>
-                        </div>
-                        <div class="flex gap-sm mt-xs items-center">
-                            <span class="w-6 text-right select-none"></span>
-                            <span class="w-2 h-4 bg-primary animate-pulse inline-block"></span>
                         </div>
                     </div>
                 </div>
+            </main>
+            <!-- Bottom Terminal Panel -->
+            <div
+                class="w-full h-80 flex flex-col border-t border-outline-variant bg-surface-container-lowest overflow-hidden shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] z-20 shrink-0">
+                <!-- Terminal Header -->
+                <div
+                    class="bg-surface-container border-b border-outline-variant flex justify-between items-center px-md py-sm shrink-0">
+                    <div class="flex items-center gap-sm">
+                        <span class="material-symbols-outlined text-on-surface-variant text-[18px]">terminal</span>
+                        <span class="font-label-caps text-label-caps text-on-surface-variant">root@vps-prod-01:~#</span>
+                    </div>
+                    <div class="flex items-center gap-sm">
+                        <button
+                            class="text-on-surface-variant hover:text-primary transition-colors flex items-center gap-xs font-label-caps text-label-caps">
+                            <span class="material-symbols-outlined text-[16px]">content_copy</span> Copy
+                        </button>
+                        <div class="w-[1px] h-4 bg-outline-variant mx-xs"></div>
+                        <button
+                            class="text-on-surface-variant hover:text-error transition-colors flex items-center gap-xs font-label-caps text-label-caps">
+                            <span class="material-symbols-outlined text-[16px]">clear_all</span> Clear
+                        </button>
+                        <div class="w-[1px] h-4 bg-outline-variant mx-xs"></div>
+                        <button
+                            class="text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center rounded">
+                            <span class="material-symbols-outlined text-[20px]">expand_more</span>
+                        </button>
+                    </div>
+                </div>
+                <!-- Terminal Canvas -->
+                <div
+                    class="flex-1 p-md overflow-y-auto font-code-block text-code-block text-on-surface variant selection:bg-primary selection:text-on-primary-fixed">
+                    <div class="flex flex-col gap-1 opacity-70">
+                        <div class="flex gap-sm text-outline">
+                            <span class="w-6 text-right select-none">1</span>
+                            <span>$ ufw allow 'Nginx Full'</span>
+                        </div>
+                        <div class="flex gap-sm">
+                            <span class="w-6 text-right select-none text-outline">2</span>
+                            <span>Rule added</span>
+                        </div>
+                        <div class="flex gap-sm">
+                            <span class="w-6 text-right select-none text-outline">3</span>
+                            <span>Rule added (v6)</span>
+                        </div>
+                        <div class="flex gap-sm text-outline mt-sm">
+                            <span class="w-6 text-right select-none">4</span>
+                            <span>$ mkdir -p /var/www/example.com/html</span>
+                        </div>
+                        <div class="flex gap-sm text-outline">
+                            <span class="w-6 text-right select-none">5</span>
+                            <span>$ chown -R $USER:$USER /var/www/example.com/html</span>
+                        </div>
+                        <div class="flex gap-sm text-outline">
+                            <span class="w-6 text-right select-none">6</span>
+                            <span>$ chmod -R 755 /var/www/example.com</span>
+                        </div>
+                        <div class="flex gap-sm text-outline mt-sm">
+                            <span class="w-6 text-right select-none">7</span>
+                            <span>$ cat &lt;&lt;EOF &gt; /etc/nginx/sites-available/example.com</span>
+                        </div>
+                        <div class="flex gap-sm text-secondary">
+                            <span class="w-6 text-right select-none text-outline">8</span>
+                            <span>server {</span>
+                        </div>
+                        <div class="flex gap-sm text-secondary pl-4">
+                            <span class="w-6 text-right select-none text-outline ml-[-1rem]">9</span>
+                            <span>listen 80;</span>
+                        </div>
+                        <div class="flex gap-sm text-secondary pl-4">
+                            <span class="w-6 text-right select-none text-outline ml-[-1rem]">10</span>
+                            <span>listen [::]:80;</span>
+                        </div>
+                        <div class="flex gap-sm text-secondary pl-4 mt-1">
+                            <span class="w-6 text-right select-none text-outline ml-[-1rem]">11</span>
+                            <span>root /var/www/example.com/html;</span>
+                        </div>
+                        <div class="flex gap-sm text-secondary pl-4">
+                            <span class="w-6 text-right select-none text-outline ml-[-1rem]">12</span>
+                            <span>index index.html index.htm index.nginx-debian.html;</span>
+                        </div>
+                        <div class="flex gap-sm text-secondary pl-4 mt-1">
+                            <span class="w-6 text-right select-none text-outline ml-[-1rem]">13</span>
+                            <span>server_name example.com www.example.com;</span>
+                        </div>
+                        <div class="flex gap-sm text-secondary pl-4 mt-1">
+                            <span class="w-6 text-right select-none text-outline ml-[-1rem]">14</span>
+                            <span>location / {</span>
+                        </div>
+                        <div class="flex gap-sm text-secondary pl-8">
+                            <span class="w-6 text-right select-none text-outline ml-[-2rem]">15</span>
+                            <span>try_files $uri $uri/ =404;</span>
+                        </div>
+                        <div class="flex gap-sm text-secondary pl-4">
+                            <span class="w-6 text-right select-none text-outline ml-[-1rem]">16</span>
+                            <span>}</span>
+                        </div>
+                        <div class="flex gap-sm text-secondary">
+                            <span class="w-6 text-right select-none text-outline">17</span>
+                            <span>}</span>
+                        </div>
+                        <div class="flex gap-sm text-outline">
+                            <span class="w-6 text-right select-none">18</span>
+                            <span>EOF</span>
+                        </div>
+                        <div class="flex gap-sm text-outline mt-sm">
+                            <span class="w-6 text-right select-none">19</span>
+                            <span>$ ln -s /etc/nginx/sites-available/example.com /etc/nginx/sites-enabled/</span>
+                        </div>
+                        <div class="flex gap-sm text-outline">
+                            <span class="w-6 text-right select-none">20</span>
+                            <span>$ nginx -t</span>
+                        </div>
+                    </div>
+                    <!-- Active typing line -->
+                    <div class="flex gap-sm mt-sm items-center">
+                        <span class="w-6 text-right select-none text-outline opacity-50">21</span>
+                        <span class="text-primary">nginx: the configuration file /etc/nginx/nginx.conf syntax is
+                            ok</span>
+                    </div>
+                    <div class="flex gap-sm items-center">
+                        <span class="w-6 text-right select-none text-outline opacity-50">22</span>
+                        <span class="text-primary">nginx: configuration file /etc/nginx/nginx.conf test is
+                            successful</span>
+                    </div>
+                    <div class="flex gap-sm mt-sm text-outline">
+                        <span class="w-6 text-right select-none">23</span>
+                        <span>$ systemctl restart nginx</span>
+                    </div>
+                    <div class="flex gap-sm mt-xs items-center">
+                        <span class="w-6 text-right select-none"></span>
+                        <span class="w-2 h-4 bg-primary animate-pulse inline-block"></span>
+                    </div>
+                </div>
             </div>
-        </main>
+        </div>
     </div>
 </body>
 
