@@ -59,6 +59,24 @@ function shellQuote(value: string) {
 	return `'${escapeForSingleQuotedValue(value)}'`;
 }
 
+function buildExecCommand(command: string) {
+	return [
+		`export __VPSM_COMMAND=${shellQuote(command)}`,
+		"if command -v bash >/dev/null 2>&1; then",
+		`\tenv PS1='' PS2='' PROMPT_COMMAND= HISTFILE=/dev/null BASH_SILENCE_DEPRECATION_WARNING=1 bash -ic 'eval "$__VPSM_COMMAND"'`,
+		"else",
+		`\tsh -lc 'eval "$__VPSM_COMMAND"'`,
+		"fi",
+	].join("\n");
+}
+
+function formatCommandFailure(command: string, result: CommandResult) {
+	const status = result.code !== null ? `exit code ${result.code}` : `signal ${result.signal || "unknown"}`;
+	const detail = (result.stderr.trim() || result.stdout.trim()).trim();
+	const snippet = detail ? `\n${detail.slice(-400)}` : "";
+	return `Command failed with ${status}: ${command}${snippet}`;
+}
+
 function collectReferencedInputs(trigger: AddonTriggerDefinition) {
 	const names = new Set<string>();
 	const expression = /\{([a-zA-Z0-9_-]+)\}/g;
@@ -155,7 +173,7 @@ export function prepareTriggerExecution(options: PrepareTriggerExecutionOptions)
 
 function runRemoteCommand(client: RemoteExecClient, command: string, events: ExecutePreparedCommandsOptions["events"], executionId: string, index: number) {
 	return new Promise<CommandResult>((resolve, reject) => {
-		client.exec(command, (error, stream) => {
+		client.exec(buildExecCommand(command), { pty: true }, (error, stream) => {
 			if (error) {
 				reject(error);
 				return;
@@ -178,8 +196,8 @@ function runRemoteCommand(client: RemoteExecClient, command: string, events: Exe
 
 			(stream as ClientChannel).on("close", (code: number | null, signal: string | undefined) => {
 				resolve({
-					stdout,
-					stderr,
+					stdout: stdout.replace(/\u001b\[[0-9;]*[a-zA-Z]/g, ""),
+					stderr: stderr.replace(/\u001b\[[0-9;]*[a-zA-Z]/g, ""),
 					code,
 					signal,
 				});
@@ -226,7 +244,7 @@ async function executeCommandSequence(options: ExecutePreparedCommandsOptions) {
 			});
 
 			if (result.code !== 0) {
-				throw new Error(`Command failed with exit code ${result.code ?? "unknown"}: ${command}`);
+				throw new Error(formatCommandFailure(command, result));
 			}
 		}
 

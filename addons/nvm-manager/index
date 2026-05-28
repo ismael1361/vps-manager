@@ -1,0 +1,168 @@
+<addon>
+    <script>
+        async function install() {
+            var isInstalled = await executeTrigger("installed").then(function (result) { return result.trim() !== ""; });
+            if (!isInstalled) {
+                await executeTrigger("install");
+            }
+            await $super.updateConfig({ nvmInstalled: true, installedAt: new Date().toISOString() });
+            await $super.notify("NVM Manager installed successfully.", "success");
+        }
+
+        async function initialize() {
+            var isInstalled = await executeTrigger("installed").then(function (result) { return result.trim() !== ""; });
+            if (!isInstalled) {
+                await $super.notify("NVM not found on VPS — removing addon configuration.", "error");
+                await $super.uninstall();
+            }
+        }
+
+        async function uninstall() {
+            var isInstalled = await executeTrigger("installed").then(function (result) { return result.trim() !== ""; });
+            if (isInstalled) {
+                await executeTrigger("uninstall");
+            }
+            await $super.notify("NVM Manager uninstalled.", "info");
+            await $super.uninstall();
+        }
+    </script>
+    <triggers>
+        <trigger event="install">
+            <actions>
+                <command>sudo apt update && sudo apt install curl -y && sudo apt install libatomic1 -y</command>
+                <command>curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/$(curl -s
+                    https://api.github.com/repos/nvm-sh/nvm/releases/latest | grep -oP '"tag_name":
+                    "\K[^"]+')/install.sh | bash</command>
+                <command>nvm install node</command>
+            </actions>
+        </trigger>
+        <trigger event="installed">
+            <actions>
+                <command>test -s ~/.nvm/nvm.sh && echo "$HOME/.nvm/nvm.sh"</command>
+            </actions>
+        </trigger>
+        <trigger event="uninstall">
+            <actions>
+                <command>rm -rf ~/.nvm</command>
+                <command>sed -i -e '/NVM_DIR/d' -e '/nvm.sh/d' -e '/bash_completion/d' ~/.bashrc</command>
+            </actions>
+        </trigger>
+        <trigger event="update">
+            <actions>
+                <command>curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/$(curl -s
+                    https://api.github.com/repos/nvm-sh/nvm/releases/latest | grep -oP '"tag_name":
+                    "\K[^"]+')/install.sh | bash</command>
+                <command>nvm install node --reinstall-packages-from=node</command>
+            </actions>
+        </trigger>
+        <trigger event="check">
+            <actions>
+                <command>test -s ~/.nvm/nvm.sh && echo "$HOME/.nvm/nvm.sh"</command>
+            </actions>
+        </trigger>
+        <trigger event="nodeVersion">
+            <actions>
+                <command>nvm current</command>
+            </actions>
+        </trigger>
+        <trigger event="listVersions">
+            <actions>
+                <command>nvm ls</command>
+            </actions>
+        </trigger>
+        <trigger event="installNodeVersion">
+            <actions>
+                <command>nvm install {version}</command>
+            </actions>
+            <inputs>
+                <input name="version" type="text" label="Node.js Version" required="true"></input>
+            </inputs>
+        </trigger>
+        <trigger event="useNodeVersion">
+            <actions>
+                <command>nvm use {version}</command>
+            </actions>
+            <inputs>
+                <input name="version" type="text" label="Node.js Version" required="true"></input>
+            </inputs>
+        </trigger>
+    </triggers>
+    <views>
+        <view name="Dashboard">
+            <script>
+                setState("currentNodeVersion", "");
+
+                async function refreshNodeVersion() {
+                    setState("currentNodeVersion", await executeTrigger('nodeVersion').then(result => result.trim()));
+                }
+
+                await refreshNodeVersion();
+            </script>
+            <template>
+                <h2>NVM Manager</h2>
+                <p>Manage Node.js versions on your VPS with ease.</p>
+                <h2>Current Node.js Version:</h2>
+                <p>{{state.currentNodeVersion || "Loading..."}}</p>
+                <button onclick="refreshNodeVersion()">Refresh Version</button>
+            </template>
+            <style></style>
+        </view>
+        <view name="Change Node.js Version">
+            <script>
+                setState("loading", true);
+                setState("nodeVersionsList", []);
+                setState("currentVersion", "");
+                state.changeNodeVersion = "";
+
+                async function refreshNodeVersions() {
+                    setState("nodeVersionsList", await executeTrigger('listVersions').then(result => {
+                        return result.split("\n").filter(v => (/^v\d+\.\d+\.\d+/g).test(v.trim().replace(/(?!\.)\W/gi, ""))).map(v => v.match(/v\d+\.\d+\.\d+/g)[0] || "").filter(v => v.trim() !== "").map(v => v.replace(/^v/, "").trim());
+                    }));
+                    setState("currentVersion", await executeTrigger('nodeVersion').then(result => result.trim()));
+                }
+
+                async function saveChange() {
+                    var changeNodeVersion = getState("changeNodeVersion", "").trim().replace(/^v/, "");
+
+                    if (!changeNodeVersion) {
+                        await $super.notify("Please enter a Node.js version to use.", "error");
+                        return;
+                    }
+                    if (getState("nodeVersionsList", []).includes(changeNodeVersion)) {
+                        await executeTrigger('useNodeVersion', { version: "v" + changeNodeVersion });
+                        await $super.notify(`Switched to Node.js version ${changeNodeVersion}.`, "success");
+                    } else {
+                        await executeTrigger('installNodeVersion', { version: "v" + changeNodeVersion });
+                        await executeTrigger('useNodeVersion', { version: "v" + changeNodeVersion });
+                        await $super.notify(`Node.js version ${changeNodeVersion} installed and set as current version.`, "success");
+                    }
+                    await refreshNodeVersions();
+                }
+
+                function onNodeVersionInput(event) {
+                    state.changeNodeVersion = event.target.value;
+                }
+
+                await refreshNodeVersions();
+
+                setState("loading", false);
+            </script>
+            <template if="state.loading">
+                <p>Loading available Node.js versions...</p>
+            </template>
+            <template if="!state.loading">
+                <h2>Change Node.js Version</h2>
+                <input class="input-node-versions" list="node-versions" oninput="onNodeVersionInput(event)"
+                    value="{{state.currentVersion}}" />
+
+                <datalist id="node-versions">
+                    {{state.nodeVersionsList.map(version => `<option value="${version}"></option>`).join('')}}
+                </datalist>
+
+                <button onclick="saveChange()">Install and Use Version</button>
+            </template>
+            <style>
+            </style>
+        </view>
+    </views>
+</addon>

@@ -3,8 +3,7 @@
    ================================================ */
 import React from "https://esm.sh/react@18";
 import { useAppState } from "../store.js";
-import { api } from "../api.js";
-import { escHtml } from "../utils.js";
+import { loadAddonsData } from "../data.js";
 
 export function Topbar(props) {
 	var connected = props.connected;
@@ -15,11 +14,7 @@ export function Topbar(props) {
 	var host = state.session.host || "—";
 
 	function handleRefreshStatus() {
-		api.getVpsStatus()
-			.then(function (s) {
-				dispatch({ type: "SET_VPS_STATUS", payload: s });
-			})
-			.catch(function () {});
+		loadAddonsData(state.session, dispatch).catch(function () {});
 	}
 
 	function handleToggleSidebar() {
@@ -76,7 +71,7 @@ export function Topbar(props) {
 					"button",
 					{
 						className: "hover:bg-surface-variant transition-colors p-xs rounded",
-						title: "Refresh status",
+						title: "Refresh VPS data",
 						onClick: handleRefreshStatus,
 					},
 					React.createElement("span", { className: "material-symbols-outlined" }, "sensors"),

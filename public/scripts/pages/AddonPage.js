@@ -5,6 +5,7 @@ import React, { useRef, useEffect, useState } from "https://esm.sh/react@18";
 import { useAppState } from "../store.js";
 import { getAddonIcon, getAddonId, getAddonState, getAddonConfigEntry } from "../utils.js";
 import { api } from "../api.js";
+import { loadAddonsData } from "../data.js";
 import { Sidebar } from "../components/Sidebar.js";
 import { Topbar } from "../components/Topbar.js";
 import { Terminal } from "../components/Terminal.js";
@@ -26,7 +27,7 @@ export function AddonPage() {
 	useEffect(
 		function () {
 			if (!entry) {
-				dispatch({ type: "NAVIGATE", payload: { page: "dashboard" } });
+				dispatch({ type: "NAVIGATE", payload: { page: "addons" } });
 			}
 		},
 		[entry],
@@ -91,7 +92,7 @@ export function AddonPage() {
 	function handleNavAddons(e) {
 		e.preventDefault();
 		cleanupCurrentView();
-		dispatch({ type: "NAVIGATE", payload: { page: "dashboard", addon: null, view: null } });
+		dispatch({ type: "NAVIGATE", payload: { page: "addons", addon: null, view: null } });
 	}
 
 	function handleUninstall() {
@@ -104,11 +105,11 @@ export function AddonPage() {
 		runAddonLifecycle(entry, "uninstall", appendLine, dispatch)
 			.then(function (result) {
 				if (result.success) {
-					// uninstall() may have already called $super.uninstall() and navigated away;
-					// If not, remove from config manually.
 					return api.removeAddonConfig(addonId).then(function () {
 						dispatch({ type: "PATCH_ADDON_CONFIG", payload: { id: addonId, entry: null } });
-						dispatch({ type: "NAVIGATE", payload: { page: "dashboard", addon: null, view: null } });
+						return loadAddonsData(state.session, dispatch).then(function () {
+							dispatch({ type: "NAVIGATE", payload: { page: "addons", addon: null, view: null } });
+						});
 					});
 				}
 			})
@@ -187,7 +188,7 @@ export function AddonPage() {
 			React.createElement(
 				"div",
 				{ className: "px-margin-desktop pt-md pb-xs flex items-center gap-xs text-on-surface-variant font-label-caps text-label-caps" },
-				React.createElement("a", { href: "#", onClick: handleNavAddons, className: "hover:text-on-surface transition-colors" }, "Add-ons"),
+				React.createElement("a", { href: "#", onClick: handleNavAddons, className: "hover:text-on-surface transition-colors" }, "Library"),
 				React.createElement("span", { className: "material-symbols-outlined", style: { fontSize: "14px" } }, "chevron_right"),
 				React.createElement("span", { className: "text-on-surface" }, addonName),
 			),

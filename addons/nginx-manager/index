@@ -1,7 +1,7 @@
 <addon>
     <script>
         async function install() {
-            var isInstalled = await executeTrigger("installed").then(function(result) { return result.trim() !== ""; });
+            var isInstalled = await executeTrigger("installed").then(function (result) { return result.trim() !== ""; });
             if (!isInstalled) {
                 await executeTrigger("install");
                 await executeTrigger("ufw_allow");
@@ -11,7 +11,7 @@
         }
 
         async function initialize() {
-            var isInstalled = await executeTrigger("installed").then(function(result) { return result.trim() !== ""; });
+            var isInstalled = await executeTrigger("installed").then(function (result) { return result.trim() !== ""; });
             if (!isInstalled) {
                 await $super.notify("Nginx not found on VPS — removing addon configuration.", "error");
                 await $super.uninstall();
@@ -19,7 +19,7 @@
         }
 
         async function uninstall() {
-            var isInstalled = await executeTrigger("installed").then(function(result) { return result.trim() !== ""; });
+            var isInstalled = await executeTrigger("installed").then(function (result) { return result.trim() !== ""; });
             if (isInstalled) {
                 await executeTrigger("uninstall");
             }
@@ -139,19 +139,18 @@
     <views>
         <view name="Dashboard">
             <script>
-                let sites = [], status = "";
+                setState("sites", []);
+                setState("status", "");
+
                 await executeTrigger("list_sites").then(result => {
-                    sites = result.split("\n").filter(site => site.trim() !== "");
-                    render();
+                    setState("sites", () => result.split("\n").filter(site => site.trim() !== ""));
                 });
                 await executeTrigger("status").then(result => {
-                    status += "Service status: \n" + result;
-                    render();
+                    setState("status", () => "Service status: \n" + result);
                 });
-                status += "\n----------------\n\n"
+                setState("status", (prev) => prev + "\n----------------\n\n");
                 await executeTrigger("test_configuration").then(result => {
-                    status += "Config syntax: \n" + result;
-                    render();
+                    setState("status", (prev) => prev + "Config syntax: \n" + result);
                 });
             </script>
 
@@ -160,10 +159,10 @@
                 <p>Use the triggers to manage your Nginx installation and sites.</p>
                 <h2>Installed Sites</h2>
                 <ul>
-                    {{sites.map(site => `<li>${site}</li>`).join("")}}
+                    {{state.sites.map(site => `<li>${site}</li>`).join("")}}
                 </ul>
                 <h2>Status</h2>
-                <code>{{status}}</code>
+                <code>{{state.status || "Loading..."}}</code>
             </template>
 
             <style>
@@ -186,43 +185,40 @@
         </view>
         <view name="Manage Sites">
             <script>
-                let sites_list = [], site_selected = null, site_content = "";
-
-                await executeTrigger("list_sites").then(result => {
-                    sites_list = result.split("\n").filter(site => site.trim() !== "");
-                    render();
-                });
+                setState("sites_list", []);
+                setState("site_selected", null);
+                setState("site_content", "");
 
                 function oninput(event) {
                     event.preventDefault();
-                    site_content = event.target.value;
+                    setState("site_content", event.target.value);
                 }
 
                 async function refreshSites() {
                     await executeTrigger("list_sites").then(result => {
-                        sites_list = result.split("\n").filter(site => site.trim() !== "");
-                        render();
+                        setState("sites_list", () => result.replace(/\r/g, "").split("\n").filter(site => site.trim() !== ""));
                     });
                 }
 
+                await refreshSites();
+
                 async function backToList() {
-                    site_selected = null;
-                    site_content = "";
+                    setState("site_selected", null);
+                    setState("site_content", "");
                     await refreshSites();
                 }
 
                 async function selectSite(site) {
-                    site_selected = site;
-                    site_content = await executeTrigger("read_site", { domain: site });
-                    render();
+                    setState("site_selected", site);
+                    setState("site_content", await executeTrigger("read_site", { domain: site }));
                 }
 
                 async function deleteSite(domain) {
                     if (confirm(`Are you sure you want to delete the site "${domain}"? This action cannot be undone.`)) {
                         await executeTrigger("delete_site", { domain });
                         alert(`Site "${domain}" has been deleted.`);
-                        site_selected = null;
-                        site_content = "";
+                        setState("site_selected", null);
+                        setState("site_content", "");
                         // Refresh the sites list
                         await refreshSites();
                     }
@@ -240,19 +236,20 @@
                     }
                 }
             </script>
-            <template if="!site_selected">
+            <template if="!state.site_selected">
                 <h1>Manage Nginx Sites</h1>
                 <p>Select a site to view or edit its configuration.</p>
                 <ul class="sites-list">
-                    {{sites_list.map(site => `<li><a href="#" onclick="selectSite('${site}')">${site}</a></li>
+                    {{state.sites_list.map(site => `<li><a href="#" onclick="selectSite('${site}')">${site}</a></li>
                     `).join("")}}
                 </ul>
             </template>
-            <template if="site_selected">
-                <h1>Site: {{site_selected}}</h1>
-                <textarea oninput="oninput(event)" style="width: 100%; height: 300px;">{{site_content}}</textarea>
-                <button onclick="editSite(site_selected)">Edit Site</button>
-                <button onclick="deleteSite(site_selected)" style="background-color: #e53e3e; color: white;">Delete
+            <template if="state.site_selected">
+                <h1>Site: {{state.site_selected}}</h1>
+                <textarea oninput="oninput(event)" style="width: 100%; height: 300px;">{{state.site_content}}</textarea>
+                <button onclick="editSite(state.site_selected)">Edit Site</button>
+                <button onclick="deleteSite(state.site_selected)"
+                    style="background-color: #e53e3e; color: white;">Delete
                     Site</button>
                 <button onclick="backToList()">Back to Sites List</button>
             </template>
@@ -300,7 +297,7 @@
             <template>
                 <h1>Create Nginx Site</h1>
                 <p>Use the form below to create a new Nginx site.</p>
-                <form onsubmit="submitForm.bind(this)(event)">
+                <form onsubmit="submitForm(event)">
                     <label for="domain">Domain:</label>
                     <input type="text" id="domain" name="domain" placeholder="example.com" required>
                     <br>

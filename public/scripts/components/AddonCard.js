@@ -5,6 +5,7 @@ import React, { useState } from "https://esm.sh/react@18";
 import { useAppState } from "../store.js";
 import { getAddonIcon, getAddonId, getAddonState } from "../utils.js";
 import { api } from "../api.js";
+import { loadAddonsData } from "../data.js";
 import { cleanupCurrentView, runAddonLifecycle } from "../addon-runner.js";
 
 export function AddonCard(props) {
@@ -58,8 +59,12 @@ export function AddonCard(props) {
 			.then(function (updatedEntry) {
 				dispatch({ type: "PATCH_ADDON_CONFIG", payload: { id: addonId, entry: updatedEntry } });
 				if (updatedEntry.state === "installed") {
-					appendLine({ type: "success", text: "✓ " + addon.name + " installed successfully." });
+					return loadAddonsData(state.session, dispatch).then(function () {
+						appendLine({ type: "success", text: "✓ " + addon.name + " installed successfully." });
+						return updatedEntry;
+					});
 				}
+				return updatedEntry;
 			})
 			.catch(function (err) {
 				appendLine({ type: "error", text: "✗ Install failed: " + err.message });

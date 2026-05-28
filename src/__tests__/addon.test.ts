@@ -2,6 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { loadAddons, parseAddonObject, parseAddonXml, AddonManifest } from "../core/addon";
+import { getBuiltInAddonsDir } from "../core/paths";
 
 function writeJson(filePath: string, content: unknown) {
 	fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -90,7 +91,7 @@ describe("addon loader", () => {
 				"        <command>printf '%s' {domain}</command>",
 				"      </actions>",
 				"      <inputs>",
-				'        <input name="domain" type="text" validation="^[a-z0-9.-]+$" />',
+				'        <input name="domain" type="text" label="Domain" required="true" validation="^[a-z0-9.-]+$" />',
 				"      </inputs>",
 				"    </trigger>",
 				"  </triggers>",
@@ -108,7 +109,38 @@ describe("addon loader", () => {
 
 		expect(manifest.triggers.map((trigger) => trigger.name)).toEqual(["status", "create_site"]);
 		expect(manifest.triggers[1].input?.[0].validation).toBe("^[a-z0-9.-]+$");
+		expect(manifest.triggers[1].input?.[0].label).toBe("Domain");
+		expect(manifest.triggers[1].input?.[0].required).toBe(true);
 		expect(manifest.views?.[0].name).toBe("Dashboard");
+	});
+
+	it("skips invalid addons while keeping valid addons in the catalog", async () => {
+		tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "vps-manager-addons-"));
+		const builtinDir = path.join(tempRoot, "builtin");
+
+		writeJson(path.join(builtinDir, "valid.json"), {
+			name: "Valid Addon",
+			version: "1.0.0",
+			description: "still loads",
+			triggers: [{ name: "status", command: ["echo ok"] }],
+		});
+
+		writeJson(path.join(builtinDir, "invalid.json"), {
+			name: "Invalid Addon",
+			version: "1.0.0",
+			description: "breaks schema",
+			triggers: [{ name: "status", command: ["echo ok"], extra: true }],
+		});
+
+		const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+		const addons = await loadAddons({ builtinDir, cwdDir: path.join(tempRoot, "cwd") });
+
+		expect(addons).toHaveLength(1);
+		expect(addons[0].addon.name).toBe("Valid Addon");
+		expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/Skipping invalid addon/));
+
+		warnSpy.mockRestore();
 	});
 
 	it("rejects invalid validation regex definitions in XML manifests", () => {
@@ -227,5 +259,20 @@ describe("addon loader", () => {
 		expect(manifest.short_name).toBe("nginx-manager");
 		expect(manifest.version).toBe("0.1.0");
 		expect(manifest.triggers[0].name).toBe("status");
+	});
+
+	it("builtin nvm addon uses setState for render-driven view updates", () => {
+		const addonDir = path.join(getBuiltInAddonsDir(), "nvm-manager");
+		const meta = JSON.parse(fs.readFileSync(path.join(addonDir, "manifest.json"), "utf8")) as Partial<AddonManifest>;
+		const manifest = parseAddonXml(fs.readFileSync(path.join(addonDir, "index"), "utf8"), path.join(addonDir, "index"), meta);
+
+		const dashboardView = manifest.views?.find((view) => view.name === "Dashboard");
+		const changeVersionView = manifest.views?.find((view) => view.name === "Change Node.js Version");
+
+		expect(dashboardView?.content.join("\n")).toContain('setState("currentNodeVersion"');
+		expect(changeVersionView?.content.join("\n")).toContain('setState("loading", true)');
+		expect(changeVersionView?.content.join("\n")).toContain('setState("nodeVersionsList"');
+		expect(changeVersionView?.content.join("\n")).toContain('getState("changeNodeVersion", "")');
+		expect(changeVersionView?.content.join("\n")).toContain("state.changeNodeVersion = event.target.value");
 	});
 });

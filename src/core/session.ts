@@ -85,7 +85,7 @@ function parseOsRelease(content: string) {
 
 function runRemoteCommand(client: RemoteExecClient, command: string) {
 	return new Promise<CommandResult>((resolve, reject) => {
-		client.exec(command, (error, stream) => {
+		client.exec(command, { pty: true }, (error, stream) => {
 			if (error) {
 				reject(error);
 				return;

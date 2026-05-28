@@ -5,6 +5,8 @@ import { getBuiltInAddonsDir, getWorkingDirectoryAddonsDir } from "./paths";
 export interface AddonInputDefinition {
 	name: string;
 	type: string;
+	label?: string;
+	required?: boolean;
 	placeholder?: string;
 	validation?: string;
 }
@@ -209,7 +211,7 @@ function parseInputDefinition(value: unknown, scope: string, sourcePath: string)
 		throw new Error(`${scope} must be an object at ${sourcePath}.`);
 	}
 
-	assertAllowedKeys(value, ["name", "type", "placeholder", "validation"], scope, sourcePath);
+	assertAllowedKeys(value, ["name", "type", "label", "required", "placeholder", "validation"], scope, sourcePath);
 
 	const validation = typeof value.validation === "string" ? value.validation : undefined;
 	if (validation) {
@@ -223,6 +225,8 @@ function parseInputDefinition(value: unknown, scope: string, sourcePath: string)
 	return {
 		name: ensureString(value.name, `${scope} name`, sourcePath),
 		type: ensureString(value.type, `${scope} type`, sourcePath),
+		label: typeof value.label === "string" ? value.label : undefined,
+		required: typeof value.required === "boolean" ? value.required : typeof value.required === "string" ? value.required.toLowerCase() !== "false" : undefined,
 		placeholder: typeof value.placeholder === "string" ? value.placeholder : undefined,
 		validation,
 	};
@@ -522,12 +526,22 @@ async function readAddonsFromDirectory(directoryPath: string, sourceType: Loaded
 		return [] as LoadedAddon[];
 	}
 
+	const warnings: string[] = [];
+
 	const dirents = fs.readdirSync(directoryPath, { withFileTypes: true });
 
 	// Subdirectories with a manifest.json follow the new directory-based addon format
 	const dirResults: LoadedAddon[] = dirents
 		.filter((entry) => entry.isDirectory() && fs.existsSync(path.join(directoryPath, entry.name, "manifest.json")))
-		.map((entry) => loadAddonFromSubdirectory(path.join(directoryPath, entry.name), sourceType));
+		.flatMap((entry) => {
+			const sourcePath = path.join(directoryPath, entry.name);
+			try {
+				return [loadAddonFromSubdirectory(sourcePath, sourceType)];
+			} catch (error) {
+				warnings.push(error instanceof Error ? error.message : String(error));
+				return [];
+			}
+		});
 
 	// Flat files follow the legacy single-file addon format
 	const entries = dirents
@@ -547,17 +561,29 @@ async function readAddonsFromDirectory(directoryPath: string, sourceType: Loaded
 			return left.localeCompare(right);
 		});
 
-	const fileResults = entries.map((entry) => {
+	const fileResults = entries.flatMap((entry) => {
 		const sourcePath = path.join(directoryPath, entry);
-		const raw = fs.readFileSync(sourcePath, "utf8");
-		const addon = parseAddonFile(raw, sourcePath);
 
-		return {
-			addon,
-			sourcePath,
-			sourceType,
-		};
+		try {
+			const raw = fs.readFileSync(sourcePath, "utf8");
+			const addon = parseAddonFile(raw, sourcePath);
+
+			return [
+				{
+					addon,
+					sourcePath,
+					sourceType,
+				},
+			];
+		} catch (error) {
+			warnings.push(error instanceof Error ? error.message : String(error));
+			return [];
+		}
 	});
+
+	for (const warning of warnings) {
+		console.warn(`[vps-manager] Skipping invalid addon: ${warning}`);
+	}
 
 	return [...fileResults, ...dirResults];
 }

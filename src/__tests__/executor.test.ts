@@ -1,7 +1,7 @@
 import { EventEmitter } from "events";
 import { executePreparedCommands, executePreparedCommandsWithOutput, prepareTriggerExecution } from "../core/executor";
 
-class FakeStream extends EventEmitter {
+class FakeExecStream extends EventEmitter {
 	stderr = new EventEmitter();
 
 	constructor(private readonly plan: { stdout?: string; stderr?: string; code?: number }) {
@@ -21,6 +21,27 @@ class FakeStream extends EventEmitter {
 			this.emit("close", this.plan.code ?? 0, undefined);
 		});
 	}
+}
+
+function createFakeExecClient(plans: Array<{ stdout?: string; stderr?: string; code?: number }>) {
+	let index = 0;
+	const commands: string[] = [];
+	return {
+		commands,
+		exec(command: string, arg2: unknown, arg3?: (error: Error | undefined, stream?: FakeExecStream) => void) {
+			const callback = typeof arg2 === "function" ? arg2 : arg3;
+			if (!callback) {
+				throw new Error("Expected exec callback.");
+			}
+
+			commands.push(command);
+			const stream = new FakeExecStream(plans[index] || {});
+			index += 1;
+			callback(undefined, stream);
+			stream.start();
+			return this;
+		},
+	};
 }
 
 describe("executor", () => {
@@ -98,13 +119,10 @@ describe("executor", () => {
 
 	it("emits execution events in command order", async () => {
 		const events: Array<{ type: string; payload: any }> = [];
-		const fakeClient = {
-			exec(command: string, callback: (error: Error | undefined, stream?: FakeStream) => void) {
-				const stream = new FakeStream({ stdout: `ran ${command}`, code: 0 });
-				callback(undefined, stream);
-				stream.start();
-			},
-		};
+		const fakeClient = createFakeExecClient([
+			{ stdout: "ran first", code: 0 },
+			{ stdout: "ran second", code: 0 },
+		]);
 
 		await executePreparedCommands({
 			executionId: "exec-1",
@@ -143,16 +161,12 @@ describe("executor", () => {
 			"command:close",
 			"execution:complete",
 		]);
+		expect(fakeClient.commands[0]).toContain("bash -ic 'eval \"$__VPSM_COMMAND\"'");
+		expect(fakeClient.commands[0]).toContain("export __VPSM_COMMAND='echo nginx'");
 	});
 
 	it("captures stdout and stderr for synchronous executions", async () => {
-		const fakeClient = {
-			exec(command: string, callback: (error: Error | undefined, stream?: FakeStream) => void) {
-				const stream = new FakeStream({ stdout: `out:${command}`, stderr: `err:${command}`, code: 0 });
-				callback(undefined, stream);
-				stream.start();
-			},
-		};
+		const fakeClient = createFakeExecClient([{ stdout: "out:echo nginx", stderr: "err:echo nginx", code: 0 }]);
 
 		const result = await executePreparedCommandsWithOutput({
 			executionId: "exec-2",
@@ -180,5 +194,33 @@ describe("executor", () => {
 		expect(result.stderr).toContain("err:echo nginx");
 		expect(result.outputs).toHaveLength(1);
 		expect(result.outputs[0].command).toBe("echo nginx");
+	});
+
+	it("includes stderr details when a command fails", async () => {
+		const fakeClient = createFakeExecClient([{ stderr: "nvm: command not found", code: 127 }]);
+
+		await expect(
+			executePreparedCommands({
+				executionId: "exec-3",
+				addonName: "nvm",
+				triggerName: "status",
+				commands: ["nvm current"],
+				session: {
+					getSnapshot() {
+						return {
+							connected: true,
+							busy: false,
+							capabilities: {
+								isRoot: true,
+								canUseSudoWithoutPassword: true,
+							},
+						};
+					},
+					async runExclusive(task) {
+						return task(fakeClient as any);
+					},
+				},
+			}),
+		).rejects.toThrow(/nvm: command not found/);
 	});
 });

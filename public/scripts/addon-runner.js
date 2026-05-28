@@ -25,7 +25,7 @@ var ADDON_VIEW_BASE_STYLES = [
 	"li { margin-bottom:4px; }",
 	"form { display:flex; flex-direction:column; gap:12px; max-width:520px; }",
 	"label { display:block; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:#bbcabf; margin-bottom:4px; }",
-	"input[type=text],input[type=number],input[type=password],select,textarea {",
+	"input[type=text],input[list],input[type=number],input[type=password],select,textarea {",
 	"  width:100%; background:#1a211d; border:1px solid #3c4a42; border-radius:2px;",
 	"  color:#dde4dd; font-family:'JetBrains Mono',monospace; font-size:13px; line-height:20px;",
 	"  padding:8px 10px; outline:none; box-sizing:border-box; transition:border-color .15s; }",
@@ -44,6 +44,8 @@ var ADDON_VIEW_BASE_STYLES = [
 	"::-webkit-scrollbar-thumb { background:#2f3632; border-radius:3px; }",
 	"::-webkit-scrollbar-thumb:hover { background:#3c4a42; }",
 ].join("\n");
+
+var ADDON_VIEW_RENDER_DEBOUNCE_MS = 16;
 
 // ---- Parsing helpers ----
 function parseViewContent(contentArray) {
@@ -119,6 +121,9 @@ export function runAddonView(viewDef, addonName, container, appendLine) {
 	container.innerHTML = "";
 	container.appendChild(shadowHost);
 	var shadowRoot = shadowHost.attachShadow({ mode: "open" });
+	var renderTimer = null;
+	var disposed = false;
+	var evalInScope = null;
 
 	function executeTrigger(triggerName, inputs) {
 		inputs = inputs || {};
@@ -152,10 +157,8 @@ export function runAddonView(viewDef, addonName, container, appendLine) {
 	// __exposeCtx__ first so evalInScope is set before any top-level await
 	var scriptBody = "__exposeCtx__(function(e){return eval(e);}, " + exportExpr + ");\n" + transformed;
 
-	var evalInScope = null;
-
 	function renderView() {
-		if (!evalInScope) return;
+		if (!evalInScope || disposed) return;
 
 		var html = templates
 			.map(function (tpl) {
@@ -171,10 +174,12 @@ export function runAddonView(viewDef, addonName, container, appendLine) {
 			.join("");
 
 		// Rewrite inline event handlers to use global registry
-		if (funcNames.length > 0) {
+		var handlerApiNames = ["render", "state", "setState", "getState", "executeTrigger"];
+		var handlerNames = Array.from(new Set(handlerApiNames.concat(funcNames)));
+		if (handlerNames.length > 0) {
 			html = html.replace(/(\s)(on\w+)="([^"]+)"/g, function (_, sp, attr, handler) {
 				var rewritten = handler;
-				funcNames.forEach(function (n) {
+				handlerNames.forEach(function (n) {
 					rewritten = rewritten.replace(new RegExp("\\b" + n + "\\b", "g"), "window['" + ctxId + "']." + n);
 				});
 				return sp + attr + '="' + rewritten + '"';
@@ -185,15 +190,56 @@ export function runAddonView(viewDef, addonName, container, appendLine) {
 		shadowRoot.innerHTML = "<style>" + combinedStyle + "</style>" + html;
 	}
 
+	function flushRender() {
+		if (renderTimer !== null) {
+			window.clearTimeout(renderTimer);
+			renderTimer = null;
+		}
+		renderView();
+	}
+
+	function scheduleRender() {
+		if (disposed || renderTimer !== null) return;
+		renderTimer = window.setTimeout(function () {
+			renderTimer = null;
+			renderView();
+		}, ADDON_VIEW_RENDER_DEBOUNCE_MS);
+	}
+
+	var viewState = {};
+
+	function getState(key, fallbackValue) {
+		var value = viewState[key];
+		return value === undefined ? fallbackValue : value;
+	}
+
+	function setState(key, value) {
+		var previousValue = viewState[key];
+		var nextValue = typeof value === "function" ? value(previousValue) : value;
+		viewState[key] = nextValue;
+
+		if (previousValue !== nextValue || typeof value === "function") {
+			scheduleRender();
+		}
+
+		return nextValue;
+	}
+
 	try {
 		// eslint-disable-next-line no-new-func
 		var AsyncFunction = async function () {}.constructor;
-		var fn = new AsyncFunction("executeTrigger", "render", "__exposeCtx__", scriptBody);
-		fn(executeTrigger, renderView, function (evalFn, funcMap) {
+		var fn = new AsyncFunction("executeTrigger", "render", "state", "setState", "getState", "__exposeCtx__", scriptBody);
+		fn(executeTrigger, flushRender, viewState, setState, getState, function (evalFn, funcMap) {
 			evalInScope = evalFn;
-			var registry = Object.assign({}, funcMap, { executeTrigger: executeTrigger });
+			var registry = Object.assign({}, funcMap, {
+				executeTrigger: executeTrigger,
+				render: flushRender,
+				state: viewState,
+				setState: setState,
+				getState: getState,
+			});
 			window[ctxId] = registry;
-			renderView();
+			flushRender();
 		}).catch(function (err) {
 			appendLine({ type: "error", text: "View runtime error: " + err.message });
 		});
@@ -202,6 +248,11 @@ export function runAddonView(viewDef, addonName, container, appendLine) {
 	}
 
 	currentViewCleanup = function () {
+		disposed = true;
+		if (renderTimer !== null) {
+			window.clearTimeout(renderTimer);
+			renderTimer = null;
+		}
 		delete window[ctxId];
 		container.innerHTML = "";
 	};
@@ -276,7 +327,7 @@ export function runAddonLifecycle(addonEntry, fnName, appendLine, dispatch) {
 		uninstall: function () {
 			return api.removeAddonConfig(addonId).then(function () {
 				dispatch({ type: "PATCH_ADDON_CONFIG", payload: { id: addonId, entry: null } });
-				dispatch({ type: "NAVIGATE", payload: { page: "dashboard", addon: null, view: null } });
+				dispatch({ type: "NAVIGATE", payload: { page: "addons", addon: null, view: null } });
 			});
 		},
 		requireAddon: function (depId) {

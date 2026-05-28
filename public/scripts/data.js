@@ -4,6 +4,43 @@
    ================================================ */
 import { api } from "./api.js";
 
+function applyInstalledAddons(list, dispatch) {
+	dispatch({
+		type: "SET_INSTALLED",
+		payload: list.map(function (entry) {
+			return entry.addon.name;
+		}),
+	});
+	dispatch({ type: "SET_INSTALLED_ADDONS", payload: list });
+	return list;
+}
+
+export function refreshInstalledAddons(dispatch) {
+	return api
+		.getInstalledAddons()
+		.then(function (list) {
+			return applyInstalledAddons(list, dispatch);
+		})
+		.catch(function () {
+			dispatch({ type: "SET_INSTALLED", payload: [] });
+			dispatch({ type: "SET_INSTALLED_ADDONS", payload: [] });
+			return [];
+		});
+}
+
+export function refreshVpsStatus(dispatch) {
+	return api
+		.getVpsStatus()
+		.then(function (status) {
+			dispatch({ type: "SET_VPS_STATUS", payload: status });
+			return status;
+		})
+		.catch(function () {
+			dispatch({ type: "SET_VPS_STATUS", payload: null });
+			return null;
+		});
+}
+
 export function loadAddonsData(session, dispatch) {
 	return api
 		.getAddons()
@@ -19,7 +56,10 @@ export function loadAddonsData(session, dispatch) {
 			});
 			dispatch({ type: "SET_ADDON_CONFIGS", payload: configs });
 		})
-		.catch(function () {})
+		.catch(function () {
+			dispatch({ type: "SET_ADDONS", payload: [] });
+			dispatch({ type: "SET_ADDON_CONFIGS", payload: {} });
+		})
 		.then(function () {
 			// Also refresh configs from the dedicated endpoint (handles addons removed from disk but still in config)
 			return api
@@ -27,22 +67,20 @@ export function loadAddonsData(session, dispatch) {
 				.then(function (configFile) {
 					dispatch({ type: "SET_ADDON_CONFIGS", payload: configFile.addons || {} });
 				})
-				.catch(function () {});
+				.catch(function () {
+					dispatch({ type: "SET_ADDON_CONFIGS", payload: {} });
+				});
 		})
 		.then(function () {
-			if (!session || !session.connected) return;
-			return api
-				.getInstalledAddons()
-				.then(function (list) {
-					dispatch({
-						type: "SET_INSTALLED",
-						payload: list.map(function (a) {
-							return a.addon.name;
-						}),
-					});
-				})
-				.catch(function () {
-					dispatch({ type: "SET_INSTALLED", payload: [] });
-				});
+			if (!session || !session.connected) {
+				dispatch({ type: "SET_INSTALLED", payload: [] });
+				dispatch({ type: "SET_INSTALLED_ADDONS", payload: [] });
+				dispatch({ type: "SET_VPS_STATUS", payload: null });
+				return;
+			}
+
+			return refreshVpsStatus(dispatch).then(function () {
+				return refreshInstalledAddons(dispatch);
+			});
 		});
 }

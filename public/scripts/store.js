@@ -8,6 +8,7 @@ export var initialState = {
 	session: { connected: false, busy: false },
 	addons: [],
 	installedAddonNames: [],
+	installedAddons: [],
 	/** Record<addonId, AddonConfigEntry> — populated from vps-manager-addons.cfg */
 	addonConfigs: {},
 	selectedAddon: null,
@@ -27,6 +28,8 @@ export function reducer(state, action) {
 			return Object.assign({}, state, { addons: action.payload });
 		case "SET_INSTALLED":
 			return Object.assign({}, state, { installedAddonNames: action.payload });
+		case "SET_INSTALLED_ADDONS":
+			return Object.assign({}, state, { installedAddons: action.payload });
 		case "SET_VPS_STATUS":
 			return Object.assign({}, state, { vpsStatus: action.payload });
 		case "SET_TERMINAL_VISIBLE":

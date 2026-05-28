@@ -10,6 +10,7 @@ import { ConnectPage } from "./pages/ConnectPage.js";
 import { DashboardPage } from "./pages/DashboardPage.js";
 import { AddonPage } from "./pages/AddonPage.js";
 import { SettingsPage } from "./pages/SettingsPage.js";
+import { AddonsLibraryPage } from "./pages/AddonsLibraryPage.js";
 
 export function App() {
 	var ctx = useAppState();
@@ -51,7 +52,10 @@ export function App() {
 				});
 			} else if (wasConnected && !payload.connected) {
 				dispatch({ type: "SET_ADDONS", payload: [] });
+				dispatch({ type: "SET_ADDON_CONFIGS", payload: {} });
 				dispatch({ type: "SET_INSTALLED", payload: [] });
+				dispatch({ type: "SET_INSTALLED_ADDONS", payload: [] });
+				dispatch({ type: "SET_VPS_STATUS", payload: null });
 				dispatch({ type: "NAVIGATE", payload: { page: "connect", addon: null, view: null } });
 			}
 		});
@@ -74,16 +78,7 @@ export function App() {
 		es.addEventListener("execution:complete", function (e) {
 			var ev = JSON.parse(e.data);
 			dispatch({ type: "APPEND_TERMINAL", payload: { type: "success", text: "✓ " + ev.payload.triggerName + " completed", eid: ev.payload.executionId } });
-			api.getInstalledAddons()
-				.then(function (list) {
-					dispatch({
-						type: "SET_INSTALLED",
-						payload: list.map(function (a) {
-							return a.addon.name;
-						}),
-					});
-				})
-				.catch(function () {});
+			loadAddonsData({ connected: connectedRef.current }, dispatch).catch(function () {});
 		});
 
 		es.addEventListener("execution:error", function (e) {
@@ -137,6 +132,7 @@ export function App() {
 	var page = state.page;
 	if (page === "connect") return React.createElement(ConnectPage);
 	if (page === "dashboard") return React.createElement(DashboardPage);
+	if (page === "addons") return React.createElement(AddonsLibraryPage);
 	if (page === "addon") return React.createElement(AddonPage);
 	if (page === "settings") return React.createElement(SettingsPage);
 	return React.createElement(ConnectPage);

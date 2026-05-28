@@ -4,13 +4,11 @@
 import React from "https://esm.sh/react@18";
 import { useAppState } from "../store.js";
 import { api } from "../api.js";
-import { loadAddonsData } from "../data.js";
-import { escHtml } from "../utils.js";
 import { cleanupCurrentView } from "../addon-runner.js";
 
 var NAV_ITEMS = [
 	{ id: "dashboard", label: "Dashboard", icon: "dashboard" },
-	{ id: "addons", label: "Add-ons", icon: "extension" },
+	{ id: "addons", label: "Library", icon: "extension" },
 	{ id: "settings", label: "Settings", icon: "settings" },
 ];
 
@@ -27,7 +25,7 @@ export function Sidebar(props) {
 		e.preventDefault();
 		if (itemId === "dashboard" || itemId === "addons") {
 			cleanupCurrentView();
-			dispatch({ type: "NAVIGATE", payload: { page: "dashboard", addon: null, view: null } });
+			dispatch({ type: "NAVIGATE", payload: { page: itemId, addon: null, view: null } });
 		} else if (itemId === "settings") {
 			dispatch({ type: "NAVIGATE", payload: { page: "settings" } });
 		}
@@ -41,7 +39,9 @@ export function Sidebar(props) {
 			.then(function () {
 				dispatch({ type: "SET_SESSION", payload: { connected: false, busy: false } });
 				dispatch({ type: "SET_ADDONS", payload: [] });
+				dispatch({ type: "SET_ADDON_CONFIGS", payload: {} });
 				dispatch({ type: "SET_INSTALLED", payload: [] });
+				dispatch({ type: "SET_INSTALLED_ADDONS", payload: [] });
 				dispatch({ type: "SET_VPS_STATUS", payload: null });
 				dispatch({ type: "NAVIGATE", payload: { page: "connect", addon: null, view: null } });
 			})
