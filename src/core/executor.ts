@@ -21,6 +21,8 @@ export interface ExecutePreparedCommandsOptions {
 	triggerName: string;
 	commands: string[];
 	session: Pick<SessionStore, "runExclusive" | "getSnapshot">;
+	cacheKey?: string;
+	cacheTtlMs?: number;
 	events?: Pick<EventStreamHub, "emit">;
 }
 
@@ -210,52 +212,55 @@ async function executeCommandSequence(options: ExecutePreparedCommandsOptions) {
 	const snapshot = options.session.getSnapshot();
 	assessCommandPlan(options.commands, snapshot);
 
-	return options.session.runExclusive(async (client) => {
-		options.events?.emit("execution:start", {
-			executionId: options.executionId,
-			addonName: options.addonName,
-			triggerName: options.triggerName,
-			commandCount: options.commands.length,
-		});
-
-		const outputs: CapturedCommandOutput[] = [];
-
-		for (const [index, command] of options.commands.entries()) {
-			options.events?.emit("command:start", {
+	return options.session.runExclusive(
+		async (client) => {
+			options.events?.emit("execution:start", {
 				executionId: options.executionId,
-				index,
-				command,
+				addonName: options.addonName,
+				triggerName: options.triggerName,
+				commandCount: options.commands.length,
 			});
 
-			const result = await runRemoteCommand(client, command, options.events, options.executionId, index);
-			outputs.push({
-				command,
-				stdout: result.stdout,
-				stderr: result.stderr,
-				code: result.code,
-				signal: result.signal,
-			});
+			const outputs: CapturedCommandOutput[] = [];
 
-			options.events?.emit("command:close", {
-				executionId: options.executionId,
-				index,
-				code: result.code,
-				signal: result.signal,
-			});
+			for (const [index, command] of options.commands.entries()) {
+				options.events?.emit("command:start", {
+					executionId: options.executionId,
+					index,
+					command,
+				});
 
-			if (result.code !== 0) {
-				throw new Error(formatCommandFailure(command, result));
+				const result = await runRemoteCommand(client, command, options.events, options.executionId, index);
+				outputs.push({
+					command,
+					stdout: result.stdout,
+					stderr: result.stderr,
+					code: result.code,
+					signal: result.signal,
+				});
+
+				options.events?.emit("command:close", {
+					executionId: options.executionId,
+					index,
+					code: result.code,
+					signal: result.signal,
+				});
+
+				if (result.code !== 0) {
+					throw new Error(formatCommandFailure(command, result));
+				}
 			}
-		}
 
-		options.events?.emit("execution:complete", {
-			executionId: options.executionId,
-			addonName: options.addonName,
-			triggerName: options.triggerName,
-		});
+			options.events?.emit("execution:complete", {
+				executionId: options.executionId,
+				addonName: options.addonName,
+				triggerName: options.triggerName,
+			});
 
-		return outputs;
-	});
+			return outputs;
+		},
+		options.cacheKey && options.cacheTtlMs ? { cacheKey: options.cacheKey, cacheTtlMs: options.cacheTtlMs } : undefined,
+	);
 }
 
 export async function executePreparedCommands(options: ExecutePreparedCommandsOptions) {

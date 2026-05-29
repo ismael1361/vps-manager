@@ -36,6 +36,23 @@ interface CommandResult {
 	signal?: string;
 }
 
+export interface ExclusiveTaskOptions {
+	cacheKey?: string;
+	cacheTtlMs?: number;
+}
+
+interface QueuedExclusiveTask {
+	resolve: () => void;
+	reject: (error: Error) => void;
+}
+
+interface CachedExclusiveTask {
+	sessionId: number;
+	expiresAt: number;
+	pending: boolean;
+	promise: Promise<unknown>;
+}
+
 function normalizeConnectionInput(input: ConnectSessionInput) {
 	const host = input.host?.trim();
 	const username = input.username?.trim();
@@ -136,6 +153,120 @@ export class SessionStore {
 		busy: false,
 	};
 	private intentionalDisconnect = false;
+	private activeSessionId = 0;
+	private runningExclusiveTask = false;
+	private pendingExclusiveTasks = 0;
+	private waitingExclusiveTasks: QueuedExclusiveTask[] = [];
+	private cachedExclusiveTasks = new Map<string, CachedExclusiveTask>();
+
+	private getCachedExclusiveTask<T>(cacheKey: string, sessionId: number) {
+		const cachedTask = this.cachedExclusiveTasks.get(cacheKey);
+		if (!cachedTask) {
+			return undefined;
+		}
+
+		if (cachedTask.sessionId !== sessionId) {
+			this.cachedExclusiveTasks.delete(cacheKey);
+			return undefined;
+		}
+
+		if (!cachedTask.pending && cachedTask.expiresAt <= Date.now()) {
+			this.cachedExclusiveTasks.delete(cacheKey);
+			return undefined;
+		}
+
+		return cachedTask.promise as Promise<T>;
+	}
+
+	private rememberCachedExclusiveTask<T>(cacheKey: string, sessionId: number, cacheTtlMs: number, task: Promise<T>) {
+		const cachedTask: CachedExclusiveTask = {
+			sessionId,
+			expiresAt: Number.POSITIVE_INFINITY,
+			pending: true,
+			promise: task,
+		};
+
+		this.cachedExclusiveTasks.set(cacheKey, cachedTask);
+
+		task.then(
+			() => {
+				if (this.cachedExclusiveTasks.get(cacheKey) !== cachedTask) {
+					return;
+				}
+
+				cachedTask.pending = false;
+				cachedTask.expiresAt = Date.now() + cacheTtlMs;
+			},
+			() => {
+				if (this.cachedExclusiveTasks.get(cacheKey) === cachedTask) {
+					this.cachedExclusiveTasks.delete(cacheKey);
+				}
+			},
+		);
+
+		return task;
+	}
+
+	clearCommandCache() {
+		this.cachedExclusiveTasks.clear();
+	}
+
+	private syncBusySnapshot() {
+		this.snapshot = {
+			...this.snapshot,
+			busy: this.snapshot.connected && this.pendingExclusiveTasks > 0,
+		};
+	}
+
+	private async acquireExclusiveTurn() {
+		this.pendingExclusiveTasks += 1;
+		this.syncBusySnapshot();
+
+		if (!this.runningExclusiveTask) {
+			this.runningExclusiveTask = true;
+			return;
+		}
+
+		await new Promise<void>((resolve, reject) => {
+			this.waitingExclusiveTasks.push({ resolve, reject });
+		});
+	}
+
+	private releaseExclusiveTurn() {
+		if (this.pendingExclusiveTasks > 0) {
+			this.pendingExclusiveTasks -= 1;
+		}
+
+		const next = this.waitingExclusiveTasks.shift();
+		if (next) {
+			next.resolve();
+		} else {
+			this.runningExclusiveTask = false;
+		}
+
+		this.syncBusySnapshot();
+	}
+
+	private flushWaitingExclusiveTasks(message: string) {
+		if (this.waitingExclusiveTasks.length === 0) {
+			this.syncBusySnapshot();
+			return;
+		}
+
+		const error = new Error(message);
+		const waiting = this.waitingExclusiveTasks.splice(0);
+		this.pendingExclusiveTasks = Math.max(0, this.pendingExclusiveTasks - waiting.length);
+
+		if (this.pendingExclusiveTasks === 0) {
+			this.runningExclusiveTask = false;
+		}
+
+		this.syncBusySnapshot();
+
+		for (const queuedTask of waiting) {
+			queuedTask.reject(error);
+		}
+	}
 
 	getSnapshot(): SessionSnapshot {
 		return {
@@ -157,6 +288,8 @@ export class SessionStore {
 					connected: false,
 					busy: false,
 				};
+				this.clearCommandCache();
+				this.flushWaitingExclusiveTasks("SSH session was disconnected.");
 			}
 		});
 
@@ -178,6 +311,8 @@ export class SessionStore {
 
 		this.client = client;
 		const capabilities = await inspectRemoteHost(client);
+		this.activeSessionId += 1;
+		this.clearCommandCache();
 		this.snapshot = {
 			connected: true,
 			busy: false,
@@ -199,6 +334,8 @@ export class SessionStore {
 			connected: false,
 			busy: false,
 		};
+		this.clearCommandCache();
+		this.flushWaitingExclusiveTasks("SSH session was disconnected.");
 
 		if (!client) {
 			return;
@@ -216,32 +353,45 @@ export class SessionStore {
 		this.intentionalDisconnect = false;
 	}
 
-	getClient(): RemoteExecClient {
+	getClient(expectedSessionId: number = this.activeSessionId): RemoteExecClient {
 		if (!this.client || !this.snapshot.connected) {
+			throw new Error("No active SSH session.");
+		}
+
+		if (expectedSessionId !== this.activeSessionId) {
 			throw new Error("No active SSH session.");
 		}
 
 		return this.client;
 	}
 
-	async runExclusive<T>(task: (client: RemoteExecClient) => Promise<T>): Promise<T> {
-		if (this.snapshot.busy) {
-			throw new Error("Another trigger is already running.");
+	async runExclusive<T>(task: (client: RemoteExecClient) => Promise<T>, options?: ExclusiveTaskOptions): Promise<T> {
+		const expectedSessionId = this.activeSessionId;
+		this.getClient(expectedSessionId);
+		const cacheKey = options?.cacheKey?.trim();
+		const cacheTtlMs = typeof options?.cacheTtlMs === "number" && options.cacheTtlMs > 0 ? options.cacheTtlMs : 0;
+
+		if (cacheKey && cacheTtlMs > 0) {
+			const cachedTask = this.getCachedExclusiveTask<T>(cacheKey, expectedSessionId);
+			if (cachedTask) {
+				return cachedTask;
+			}
 		}
 
-		const client = this.getClient();
-		this.snapshot = {
-			...this.snapshot,
-			busy: true,
-		};
+		const execution = (async () => {
+			await this.acquireExclusiveTurn();
 
-		try {
-			return await task(client);
-		} finally {
-			this.snapshot = {
-				...this.snapshot,
-				busy: false,
-			};
+			try {
+				return await task(this.getClient(expectedSessionId));
+			} finally {
+				this.releaseExclusiveTurn();
+			}
+		})();
+
+		if (cacheKey && cacheTtlMs > 0) {
+			return this.rememberCachedExclusiveTask(cacheKey, expectedSessionId, cacheTtlMs, execution);
 		}
+
+		return execution;
 	}
 }

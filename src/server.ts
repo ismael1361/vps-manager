@@ -43,6 +43,8 @@ interface RemoteCommandResult {
 	signal?: string;
 }
 
+const REMOTE_COMMAND_CACHE_TTL_MS = 5000;
+
 const DEFAULT_PORT = 3000;
 const MAX_PORT = 3100;
 
@@ -170,6 +172,18 @@ function parseKeyValueOutput(content: string) {
 	return values;
 }
 
+function shouldCacheTriggerExecution(triggerName: string, commands: string[]) {
+	if (commands.length !== 1) {
+		return false;
+	}
+
+	if (/^(install|update|use|delete|edit|create|restart|reload|uninstall|save|apply|write|patch|remove)/i.test(triggerName)) {
+		return false;
+	}
+
+	return /^(check|installed|status|list|read|get|show)/i.test(triggerName) || /version/i.test(triggerName);
+}
+
 async function readInstalledAddons(services: AppServices, configStore: AddonConfigStore) {
 	if (!services.session.getSnapshot().connected) {
 		throw new Error("Connect to a VPS before checking installed add-ons.");
@@ -207,10 +221,13 @@ async function readVpsStatus(services: AppServices) {
 		"printf '\\n'",
 	].join("; ");
 
-	const system = await services.session.runExclusive(async (client) => {
-		const result = await runRemoteCommand(client, probeCommand);
-		return parseKeyValueOutput(result.stdout);
-	});
+	const system = await services.session.runExclusive(
+		async (client) => {
+			const result = await runRemoteCommand(client, probeCommand);
+			return parseKeyValueOutput(result.stdout);
+		},
+		{ cacheKey: probeCommand, cacheTtlMs: REMOTE_COMMAND_CACHE_TTL_MS },
+	);
 
 	return {
 		connection: snapshot,
@@ -436,13 +453,20 @@ export function createApp(services: AppServices) {
 				snapshot: services.session.getSnapshot(),
 			});
 			const executionId = randomUUID();
+			const shouldCache = shouldCacheTriggerExecution(trigger.name, prepared.commands);
 			const result = await executePreparedCommandsWithOutput({
 				executionId,
 				addonName: addon.addon.name,
 				triggerName: trigger.name,
 				commands: prepared.commands,
 				session: services.session,
+				cacheKey: shouldCache ? prepared.commands[0] : undefined,
+				cacheTtlMs: shouldCache ? REMOTE_COMMAND_CACHE_TTL_MS : undefined,
 			});
+
+			if (!shouldCache) {
+				services.session.clearCommandCache();
+			}
 
 			res.json({
 				executionId,
@@ -488,9 +512,13 @@ export function createApp(services: AppServices) {
 				commands: prepared.commands,
 				session: services.session,
 				events: services.events,
-			}).catch((error) => {
-				console.error(errorMessage(error));
-			});
+			})
+				.then(() => {
+					services.session.clearCommandCache();
+				})
+				.catch((error) => {
+					console.error(errorMessage(error));
+				});
 
 			res.status(202).json({
 				accepted: true,

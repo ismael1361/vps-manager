@@ -268,11 +268,18 @@ describe("addon loader", () => {
 
 		const dashboardView = manifest.views?.find((view) => view.name === "Dashboard");
 		const changeVersionView = manifest.views?.find((view) => view.name === "Change Node.js Version");
+		const nodeVersionTrigger = manifest.triggers.find((trigger) => trigger.name === "nodeVersion");
+		const installNodeVersionTrigger = manifest.triggers.find((trigger) => trigger.name === "installNodeVersion");
+		const useNodeVersionTrigger = manifest.triggers.find((trigger) => trigger.name === "useNodeVersion");
 
 		expect(dashboardView?.content.join("\n")).toContain('setState("currentNodeVersion"');
 		expect(changeVersionView?.content.join("\n")).toContain('setState("loading", true)');
 		expect(changeVersionView?.content.join("\n")).toContain('setState("nodeVersionsList"');
 		expect(changeVersionView?.content.join("\n")).toContain('getState("changeNodeVersion", "")');
 		expect(changeVersionView?.content.join("\n")).toContain("state.changeNodeVersion = event.target.value");
+		expect(nodeVersionTrigger?.command[0]).toBe("nvm version default");
+		expect(installNodeVersionTrigger?.command[0]).toContain("nvm alias default {version}");
+		expect(useNodeVersionTrigger?.command[0]).toContain("nvm alias default {version}");
+		expect(useNodeVersionTrigger?.command[0]).toContain("nvm use default");
 	});
 });

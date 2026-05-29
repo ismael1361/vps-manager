@@ -191,7 +191,7 @@
 
                 function oninput(event) {
                     event.preventDefault();
-                    setState("site_content", event.target.value);
+                    state.site_content = event.target.value;
                 }
 
                 async function refreshSites() {
@@ -224,30 +224,24 @@
                     }
                 }
 
-                async function editSite(domain) {
-                    let currentContent = "";
-                    await executeTrigger("read_site", { domain }).then(result => {
-                        currentContent = result;
-                    });
-                    const newContent = prompt(`Edit configuration for "${domain}":`, currentContent);
-                    if (newContent !== null) {
-                        await executeTrigger("edit_site", { domain, content: newContent });
-                        alert(`Site "${domain}" has been updated.`);
-                    }
+                async function saveSite(domain) {
+                    await executeTrigger("edit_site", { domain, content: state.site_content });
+                    alert(`Site "${domain}" has been updated.`);
                 }
             </script>
             <template if="!state.site_selected">
                 <h1>Manage Nginx Sites</h1>
                 <p>Select a site to view or edit its configuration.</p>
                 <ul class="sites-list">
-                    {{state.sites_list.map(site => `<li><a href="#" onclick="selectSite('${site}')">${site}</a></li>
-                    `).join("")}}
+                    {{state.sites_list.length > 0 ? state.sites_list.map(site => `<li><a href="#"
+                            onclick="selectSite('${site}')">${site}</a></li>
+                    `).join("") : "<li>No sites available</li>"}}
                 </ul>
             </template>
             <template if="state.site_selected">
                 <h1>Site: {{state.site_selected}}</h1>
                 <textarea oninput="oninput(event)" style="width: 100%; height: 300px;">{{state.site_content}}</textarea>
-                <button onclick="editSite(state.site_selected)">Edit Site</button>
+                <button onclick="saveSite(state.site_selected)">Save Site</button>
                 <button onclick="deleteSite(state.site_selected)"
                     style="background-color: #e53e3e; color: white;">Delete
                     Site</button>

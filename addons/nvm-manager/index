@@ -33,7 +33,7 @@
                 <command>curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/$(curl -s
                     https://api.github.com/repos/nvm-sh/nvm/releases/latest | grep -oP '"tag_name":
                     "\K[^"]+')/install.sh | bash</command>
-                <command>nvm install node</command>
+                <command>nvm install node && nvm alias default node && nvm use default</command>
             </actions>
         </trigger>
         <trigger event="installed">
@@ -52,7 +52,8 @@
                 <command>curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/$(curl -s
                     https://api.github.com/repos/nvm-sh/nvm/releases/latest | grep -oP '"tag_name":
                     "\K[^"]+')/install.sh | bash</command>
-                <command>nvm install node --reinstall-packages-from=node</command>
+                <command>nvm install node --reinstall-packages-from=node && nvm alias default node && nvm use default
+                </command>
             </actions>
         </trigger>
         <trigger event="check">
@@ -62,7 +63,7 @@
         </trigger>
         <trigger event="nodeVersion">
             <actions>
-                <command>nvm current</command>
+                <command>nvm version default</command>
             </actions>
         </trigger>
         <trigger event="listVersions">
@@ -72,7 +73,7 @@
         </trigger>
         <trigger event="installNodeVersion">
             <actions>
-                <command>nvm install {version}</command>
+                <command>nvm install {version} && nvm alias default {version} && nvm use default</command>
             </actions>
             <inputs>
                 <input name="version" type="text" label="Node.js Version" required="true"></input>
@@ -80,7 +81,7 @@
         </trigger>
         <trigger event="useNodeVersion">
             <actions>
-                <command>nvm use {version}</command>
+                <command>nvm alias default {version} && nvm use default</command>
             </actions>
             <inputs>
                 <input name="version" type="text" label="Node.js Version" required="true"></input>
@@ -101,7 +102,7 @@
             <template>
                 <h2>NVM Manager</h2>
                 <p>Manage Node.js versions on your VPS with ease.</p>
-                <h2>Current Node.js Version:</h2>
+                <h2>Default Node.js Version:</h2>
                 <p>{{state.currentNodeVersion || "Loading..."}}</p>
                 <button onclick="refreshNodeVersion()">Refresh Version</button>
             </template>
@@ -130,11 +131,11 @@
                     }
                     if (getState("nodeVersionsList", []).includes(changeNodeVersion)) {
                         await executeTrigger('useNodeVersion', { version: "v" + changeNodeVersion });
-                        await $super.notify(`Switched to Node.js version ${changeNodeVersion}.`, "success");
+                        await $super.notify(`Default Node.js version set to ${changeNodeVersion}.`, "success");
                     } else {
                         await executeTrigger('installNodeVersion', { version: "v" + changeNodeVersion });
                         await executeTrigger('useNodeVersion', { version: "v" + changeNodeVersion });
-                        await $super.notify(`Node.js version ${changeNodeVersion} installed and set as current version.`, "success");
+                        await $super.notify(`Node.js version ${changeNodeVersion} installed and set as default version.`, "success");
                     }
                     await refreshNodeVersions();
                 }

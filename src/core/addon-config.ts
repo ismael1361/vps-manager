@@ -3,6 +3,8 @@ import path from "path";
 import type { ClientChannel } from "ssh2";
 import { SessionStore, type RemoteExecClient } from "./session";
 
+const REMOTE_COMMAND_CACHE_TTL_MS = 5000;
+
 export type AddonState = "pending" | "installed" | "error" | "uninstalled";
 
 export interface AddonConfigMeta {
@@ -255,14 +257,17 @@ export class RemoteAddonConfigStore implements AddonConfigStore {
 			return createEmptyConfig();
 		}
 
-		return this.session.runExclusive(async (client) => {
-			const result = await runRemoteCommand(client, buildRemoteReadCommand());
-			if (result.code !== 0 && result.code !== null) {
-				throw new Error(result.stderr.trim() || "Failed to read add-on configuration from the VPS.");
-			}
+		return this.session.runExclusive(
+			async (client) => {
+				const result = await runRemoteCommand(client, buildRemoteReadCommand());
+				if (result.code !== 0 && result.code !== null) {
+					throw new Error(result.stderr.trim() || "Failed to read add-on configuration from the VPS.");
+				}
 
-			return parseConfigContent(result.stdout);
-		});
+				return parseConfigContent(result.stdout);
+			},
+			{ cacheKey: buildRemoteReadCommand(), cacheTtlMs: REMOTE_COMMAND_CACHE_TTL_MS },
+		);
 	}
 
 	private async writeRemote(data: AddonConfigFile): Promise<void> {
@@ -277,6 +282,7 @@ export class RemoteAddonConfigStore implements AddonConfigStore {
 				throw new Error(result.stderr.trim() || "Failed to persist add-on configuration on the VPS.");
 			}
 		});
+		this.session.clearCommandCache();
 	}
 
 	private enqueueWrite(fn: (data: AddonConfigFile) => AddonConfigFile): Promise<AddonConfigFile> {
