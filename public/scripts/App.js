@@ -7,6 +7,7 @@ import { useAppState } from "./store.js";
 import { api } from "./api.js";
 import { loadAddonsData } from "./data.js";
 import { ConnectPage } from "./pages/ConnectPage.js";
+import { SplashPage } from "./pages/SplashPage.js";
 import { DashboardPage } from "./pages/DashboardPage.js";
 import { AddonPage } from "./pages/AddonPage.js";
 import { SettingsPage } from "./pages/SettingsPage.js";
@@ -130,10 +131,11 @@ export function App() {
 	}, []);
 
 	var page = state.page;
+	if (page === "splash") return React.createElement(SplashPage);
 	if (page === "connect") return React.createElement(ConnectPage);
 	if (page === "dashboard") return React.createElement(DashboardPage);
 	if (page === "addons") return React.createElement(AddonsLibraryPage);
 	if (page === "addon") return React.createElement(AddonPage);
 	if (page === "settings") return React.createElement(SettingsPage);
-	return React.createElement(ConnectPage);
+	return React.createElement(SplashPage);
 }

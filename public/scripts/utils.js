@@ -53,29 +53,146 @@ export function getAddonIcon(name) {
 	return { icon: "extension", color: "text-on-surface-variant" };
 }
 
-// ---- localStorage helpers (never stores passwords) ----
-var STORAGE_KEY = "vpsm_last_conn";
+// ---- localStorage helpers (never stores passwords or private keys) ----
+var STORAGE_KEY = "vpsm_recent_connections";
+var LEGACY_STORAGE_KEY = "vpsm_last_conn";
+var MAX_RECENT_CONNECTIONS = 6;
+
+function normalizeStoredConnection(data) {
+	if (!data || typeof data !== "object") {
+		return null;
+	}
+
+	var host = typeof data.host === "string" ? data.host.trim() : "";
+	var username = typeof data.username === "string" ? data.username.trim() : "";
+	var port = parseInt(data.port, 10);
+
+	if (!host) {
+		return null;
+	}
+
+	if (!username) {
+		username = "root";
+	}
+
+	if (!Number.isInteger(port) || port < 1 || port > 65535) {
+		port = 22;
+	}
+
+	return {
+		host: host,
+		port: port,
+		username: username,
+	};
+}
+
+function dedupeRecentConnections(connections) {
+	var unique = [];
+	var seen = Object.create(null);
+
+	for (var i = 0; i < connections.length; i += 1) {
+		var connection = normalizeStoredConnection(connections[i]);
+		if (!connection) {
+			continue;
+		}
+
+		var key = connection.username.toLowerCase() + "@" + connection.host.toLowerCase() + ":" + connection.port;
+		if (seen[key]) {
+			continue;
+		}
+
+		seen[key] = true;
+		unique.push(connection);
+
+		if (unique.length >= MAX_RECENT_CONNECTIONS) {
+			break;
+		}
+	}
+
+	return unique;
+}
+
+function parseStoredConnections(raw) {
+	var parsed = JSON.parse(raw);
+	if (Array.isArray(parsed)) {
+		return dedupeRecentConnections(parsed);
+	}
+
+	var connection = normalizeStoredConnection(parsed);
+	return connection ? [connection] : [];
+}
+
+export function loadRecentConnections() {
+	try {
+		var raw = localStorage.getItem(STORAGE_KEY);
+		var legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+		var connections = raw ? parseStoredConnections(raw) : [];
+
+		if (!connections.length && legacyRaw) {
+			connections = parseStoredConnections(legacyRaw);
+		}
+
+		if (legacyRaw) {
+			localStorage.removeItem(LEGACY_STORAGE_KEY);
+		}
+
+		if (connections.length) {
+			localStorage.setItem(STORAGE_KEY, JSON.stringify(connections));
+		} else if (raw || legacyRaw) {
+			localStorage.removeItem(STORAGE_KEY);
+		}
+
+		return connections;
+	} catch (_) {
+		return [];
+	}
+}
+
+export function saveRecentConnection(data) {
+	try {
+		var connection = normalizeStoredConnection(data);
+		if (!connection) {
+			return loadRecentConnections();
+		}
+
+		var current = loadRecentConnections();
+		var next = dedupeRecentConnections([connection].concat(current));
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+		return next;
+	} catch (_) {
+		return [];
+	}
+}
+
+export function removeRecentConnection(data) {
+	try {
+		var connection = normalizeStoredConnection(data);
+		if (!connection) {
+			return loadRecentConnections();
+		}
+
+		var current = loadRecentConnections();
+		var next = current.filter(function (entry) {
+			return entry.host.toLowerCase() !== connection.host.toLowerCase() || entry.port !== connection.port || entry.username.toLowerCase() !== connection.username.toLowerCase();
+		});
+
+		if (next.length) {
+			localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+		} else {
+			localStorage.removeItem(STORAGE_KEY);
+		}
+
+		return next;
+	} catch (_) {
+		return [];
+	}
+}
 
 export function saveLastConnection(data) {
-	try {
-		localStorage.setItem(
-			STORAGE_KEY,
-			JSON.stringify({
-				host: data.host || "",
-				port: data.port || 22,
-				username: data.username || "",
-				authMethod: data.authMethod || "password",
-				privateKey: data.privateKey || "",
-			}),
-		);
-	} catch (_) {}
+	return saveRecentConnection(data);
 }
 
 export function loadLastConnection() {
-	try {
-		var raw = localStorage.getItem(STORAGE_KEY);
-		return raw ? JSON.parse(raw) : null;
-	} catch (_) {
-		return null;
-	}
+	var connections = loadRecentConnections();
+	return connections[0] || null;
 }

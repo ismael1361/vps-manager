@@ -17,7 +17,7 @@ export var initialState = {
 	terminalVisible: false,
 	sidebarOpen: false,
 	vpsStatus: null,
-	page: "connect",
+	page: "splash",
 };
 
 export function reducer(state, action) {
