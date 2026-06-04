@@ -74,7 +74,7 @@ export function AddonPage() {
 	useEffect(
 		function () {
 			if (!containerRef.current || !viewDef) return;
-			runAddonView(viewDef, addonName, containerRef.current, appendLine);
+			runAddonView(viewDef, entry, containerRef.current, appendLine, dispatch);
 			dispatch({ type: "CLEAR_TERMINAL" });
 			return function () {
 				cleanupCurrentView();

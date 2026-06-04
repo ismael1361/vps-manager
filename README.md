@@ -51,6 +51,27 @@ O parser valida estritamente o schema abaixo:
 
 O loader aceita arquivos XML com extensao .xml e, por compatibilidade local, tambem arquivos XML sem extensao dentro da pasta addons.
 
+## Runtime de views
+
+As views de add-on agora sao executadas em um iframe filho compilado para HTML em blob.
+
+- O iframe isola window, document, estilos e bibliotecas carregadas pela view.
+- O script da view pode usar top-level await e imports ESM remotos, como imports via CDN.
+- render, state, setState e getState existem apenas no escopo do iframe.
+- executeTrigger e $super.* sao expostos por bridge via postMessage para o host.
+- install, initialize e uninstall continuam executando no host, fora do iframe.
+
+Na pratica, isso significa que a view pode usar APIs locais do navegador dentro do iframe, como document, alert e confirm, sem acessar diretamente o store ou o escopo global da aplicacao pai.
+
+### APIs da view
+
+- state: objeto de estado local da view.
+- setState(key, valueOrUpdater): atualiza estado local e agenda rerender.
+- getState(key, fallback): le estado local com fallback.
+- render(): forca rerender imediato dentro do iframe.
+- executeTrigger(name, inputs): chama triggers do add-on no host.
+- $super.readConfig(), $super.updateConfig(), $super.notify(), $super.uninstall(), $super.requireAddon(): operacoes privilegiadas encaminhadas ao host.
+
 ## Limites intencionais da V1
 
 - Sem persistencia de segredos em disco.
